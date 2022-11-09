@@ -11,7 +11,7 @@
 #import re
 from FirmwareStorageFormat.SectionHeader import *
 import logging
-import sys
+#import sys
 import GenCrc32
 import argparse
 from Compress import *
@@ -390,19 +390,16 @@ def GenSectionCommonLeafSection(InputFileName:str,InputFileNum:int,SectionType:i
             return STATUS_ERROR
         status = STATUS_ERROR
         Data=InFile.read()
-        if Data == None:
-            logger.error("Error reading file")
-            return STATUS_ERROR
     
     InputFileLength = len(Data)
     CommonSect = EFI_COMMON_SECTION_HEADER()
-    HeaderLength = len(EFI_COMMON_SECTION_HEADER)
+    HeaderLength = sizeof(EFI_COMMON_SECTION_HEADER)
     TotalLength = InputFileLength + HeaderLength
     
     #Size must fit in 3 bytes,or change its header type
     if TotalLength >= MAX_SECTION_SIZE:
         CommonSect = EFI_COMMON_SECTION_HEADER2()
-        HeaderLength = len(EFI_COMMON_SECTION_HEADER2)
+        HeaderLength = sizeof(EFI_COMMON_SECTION_HEADER2)
         TotalLength = HeaderLength + InputFileLength
         CommonSect.Size[0] = 0xff
         CommonSect.Size[1] = 0xff
@@ -421,8 +418,11 @@ def GenSectionCommonLeafSection(InputFileName:str,InputFileNum:int,SectionType:i
 
 #Converts Align String to align value (1~16M).
 def StringtoAlignment(AlignBuffer:str, AlignNumber:int) -> int:
-    if AlignBuffer is None:
+
+    #Check AlignBuffer
+    if AlignBuffer == None:
         return EFI_INVALID_PARAMETER
+
     for Index in range(len(mAlignName)):
         if AlignBuffer == mAlignName [Index]:
             AlignNumber = 1 << Index
@@ -431,22 +431,19 @@ def StringtoAlignment(AlignBuffer:str, AlignNumber:int) -> int:
 
    
 #Get the contents of all section files specified in InputFileName into FileBuffer
-def GetSectionContents(InputFileName:str,InputFileAlign:int,InputFileNum:int,FileBuffer:int,
-                       BufferLength:int)-> int:
+def GetSectionContents(InputFileName:str,InputFileAlign:int,InputFileNum:int,BufferLength:int,
+                        FileBuffer=b'',)-> int:
     
     logger=logging.getLogger('GenSec')
 
     if InputFileNum < 1:
         logger.error("Invalid parameter, must specify at least one input file")
-    if BufferLength is None:
+    if BufferLength == None:
         logger.error("Invalid parameter, BufferLength can't be NULL")
 
     Size = 0
     Offset = 0 
     TeOffset = 0
-
-    #with open (OutputFileName,'rb') as OutputFile:
-    #    FileBuffer = OutputFile.read()
 
     #Go through array of file names and copy their contents
     for Index in range(InputFileNum):
@@ -477,25 +474,23 @@ def GetSectionContents(InputFileName:str,InputFileAlign:int,InputFileNum:int,Fil
             else:
                 HeaderSize = sizeof(EFI_COMMON_SECTION_HEADER)
                 
-            TempHeaderSec = EFI_COMMON_SECTION_HEADER2(Data[0:HeaderSize])
+            TempSectHeader = EFI_COMMON_SECTION_HEADER2(Data[0:HeaderSize])
             
-            if TempHeaderSec.Type == EFI_SECTION_TE:
+            if TempSectHeader.Type == EFI_SECTION_TE:
                 #Header = EFI_TE_IMAGE_HEADER()
                 TeHeaderSize = sizeof(EFI_TE_IMAGE_HEADER)
                 TeHeader = EFI_TE_IMAGE_HEADER(Data[0:TeHeaderSize])
                 if TeHeader.Signature == EFI_TE_IMAGE_HEADER_SIGNATURE:
                     TeOffset = TeHeader.StrippedSize - sizeof(TeHeader)
 
-            elif TempHeaderSec.Type == EFI_SECTION_GUID_DEFINED:
+            elif TempSectHeader.Type == EFI_SECTION_GUID_DEFINED:
                 if FileSize >= MAX_SECTION_SIZE:
-                    #GuidHeader = EFI_GUID_DEFINED_SECTION2(Data[0:GuidHeaderSize])
-                    #GuidHeaderSize = sizeof(EFI_GUID_DEFINED_SECTION2)
+
                     GuidSectHeader2 = EFI_GUID_DEFINED_SECTION2(Data[0:sizeof(EFI_GUID_DEFINED_SECTION2)])
                     if GuidSectHeader2.Attributes & EFI_GUIDED_SECTION_PROCESSING_REQUIRED == 0:
                         HeaderSize = GuidSectHeader2.DataOffset
                 else:
-                    #GuidHeader = EFI_GUID_DEFINED_SECTION()
-                    #GuidHeaderSize = sizeof(EFI_GUID_DEFINED_SECTION)
+                    
                     GuidSectHeader = EFI_GUID_DEFINED_SECTION(Data[0:sizeof(GuidSectHeader)])
                     if GuidSectHeader.Attributes & EFI_GUIDED_SECTION_PROCESSING_REQUIRED == 0:
                         HeaderSize = GuidSectHeader.DataOffset
@@ -514,7 +509,7 @@ def GetSectionContents(InputFileName:str,InputFileAlign:int,InputFileNum:int,Fil
                 #The maximal alignment is 64K, the raw section size must be less than 0xffffff
                 if FileBuffer != None and ((Size + Offset) < BufferLength):
                     FileBuffer[Size:Size + Offset] = 0
-                    SectHeader = EFI_COMMON_SECTION_HEADER(FileBuffer[Size:])
+                    SectHeader = EFI_COMMON_SECTION_HEADER(FileBuffer[Size:Size + sizeof(EFI_COMMON_SECTION_HEADER)])
                     SectHeader.Type = EFI_SECTION_RAW
                     SectHeader.SET_SECTION_SIZE(Offset)
                 Size = Size + Offset
@@ -522,8 +517,6 @@ def GetSectionContents(InputFileName:str,InputFileAlign:int,InputFileNum:int,Fil
         #Now read the contents of the file into the buffer
         #Buffer must be enough to contain the file content.
         if FileSize > 0 and FileBuffer != None and ((Size + FileSize) <= BufferLength):
-            #with open(FileBuffer,'wb') as buffer:
-            #   OutputFile = buffer.read(InFile)
             FileBuffer[Size:] = Data
         Size += FileSize
 
