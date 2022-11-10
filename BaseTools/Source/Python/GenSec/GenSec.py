@@ -508,7 +508,15 @@ def GetSectionContents(InputFileName:str,InputFileAlign:int,InputFileNum:int,Buf
 
                 #The maximal alignment is 64K, the raw section size must be less than 0xffffff
                 if FileBuffer != None and ((Size + Offset) < BufferLength):
-                    FileBuffer[Size:Size + Offset] = 0
+
+                    str0 = b''
+                    i = Offset
+                    while i > 0:
+                        str0 = str0 + b'0'
+                        i = i - 1
+                    
+                    FileBuffer = FileBuffer.replace(FileBuffer[Size:Size + Offset],str0)
+                    #FileBuffer[Size:Size + Offset] = 0
                     SectHeader = EFI_COMMON_SECTION_HEADER(FileBuffer[Size:Size + sizeof(EFI_COMMON_SECTION_HEADER)])
                     SectHeader.Type = EFI_SECTION_RAW
                     SectHeader.SET_SECTION_SIZE(Offset)
@@ -517,6 +525,8 @@ def GetSectionContents(InputFileName:str,InputFileAlign:int,InputFileNum:int,Buf
         #Now read the contents of the file into the buffer
         #Buffer must be enough to contain the file content.
         if FileSize > 0 and FileBuffer != None and ((Size + FileSize) <= BufferLength):
+            
+            
             FileBuffer[Size:] = Data
         Size += FileSize
 
@@ -533,7 +543,7 @@ def GetSectionContents(InputFileName:str,InputFileAlign:int,InputFileNum:int,Buf
 #Input file must be already sectioned. The function won't validate
 #the input files' contents. Caller should hand in files already
 #with section header.
-def GenSectionCompressionSection(InputFileName:str,InputFileAlign:int,InputFileNum:int,SectCompSubType:int,OutFileBuffer:int) -> int:    
+def GenSectionCompressionSection(InputFileName:str,InputFileAlign:int,InputFileNum:int,SectCompSubType:int,OutFileBuffer = b'') -> int:    
     #Read all input file contenes into a buffer 
     #first get the size of all contents
     
@@ -541,19 +551,19 @@ def GenSectionCompressionSection(InputFileName:str,InputFileAlign:int,InputFileN
     
     CompressFunction = COMPRESS_FUNCTION()
     
-    FileBuffer = None
+    FileBuffer = b''
     InputLength = 0
-    Status = GetSectionContents(InputFileName,InputFileAlign,InputFileNum,FileBuffer,InputLength)
+    Status = GetSectionContents(InputFileName,InputFileAlign,InputFileNum,InputLength,FileBuffer)
     
     if Status == EFI_BUFFER_TOO_SMALL:
-        #if FileBuffer ==None:
-        #    return EFI_OUT_OF_RESOURCES
-        Status = GetSectionContents(InputFileName,InputFileAlign,InputFileName,FileBuffer,InputLength)
+        
+        #Read all input file contents into a buffer
+        Status = GetSectionContents(InputFileName,InputFileAlign,InputFileName,InputLength,FileBuffer)
     
     if EFI_ERROR(Status):
         return Status
     
-    if Status == None:
+    if FileBuffer == None:
         return EFI_OUT_OF_RESOURCES
     
     #Now data is in FileBuffer, compress the data
@@ -566,7 +576,8 @@ def GenSectionCompressionSection(InputFileName:str,InputFileAlign:int,InputFileN
         
         #Copy file buffer to the none compressed data
         OutputBuffer = b''
-        OutputBuffer[HeaderLength:] = FileBuffer[0:CompressedLength]
+        OutputBuffer = OutputBuffer.replace(OutputBuffer[HeaderLength:],FileBuffer)
+        #OutputBuffer[HeaderLength:] = FileBuffer
         FileBuffer = OutputBuffer
         
     elif SectCompSubType == EFI_STANDARD_COMPRESSION:
@@ -576,6 +587,7 @@ def GenSectionCompressionSection(InputFileName:str,InputFileAlign:int,InputFileN
         logger.error("Invalid parameter, unknown compression type")
         return EFI_ABORTED
     
+    #Actual compressing 
     if CompressFunction != None:
         Status = CompressFunction(FileBuffer,InputLength,OutputBuffer,CompressedLength)
         if Status == EFI_BUFFER_TOO_SMALL:
@@ -595,24 +607,24 @@ def GenSectionCompressionSection(InputFileName:str,InputFileAlign:int,InputFileN
     
     #Add the section header for the compressed data    
     if TotalLength >= MAX_SECTION_SIZE:
-        CompressionSect2 = EFI_COMPRESSION_SECTION2(FileBuffer)
+        CompressionSect = EFI_COMPRESSION_SECTION2()
+        CompressionSect.CommonHeader.Size[0] = 0xff
+        CompressionSect.CommonHeader.Size[1] = 0xff
+        CompressionSect.CommonHeader.Size[2] = 0xff
         
-        CompressionSect2.CommonHeader.Size[0] = 0xff
-        CompressionSect2.CommonHeader.Size[1] = 0xff
-        CompressionSect2.CommonHeader.Size[2] = 0xff
-        
-        CompressionSect2.CommonHeader.Type = EFI_SECTION_COMPRESSION
-        CompressionSect2.CommonHeader.ExtendedSize = TotalLength
-        CompressionSect2.CompressionType = SectCompSubType
-        CompressionSect2.UncompressedLength = InputLength
+        CompressionSect.CommonHeader.Type = EFI_SECTION_COMPRESSION
+        CompressionSect.CommonHeader.ExtendedSize = TotalLength
+        CompressionSect.CompressionType = SectCompSubType
+        CompressionSect.UncompressedLength = InputLength
     else:
-        CompressionSect = EFI_COMPRESSION_SECTION(FileBuffer)
+        CompressionSect = EFI_COMPRESSION_SECTION()
         CompressionSect.CommonHeader.Type = EFI_SECTION_COMPRESSION
         CompressionSect.CommonHeader.SET_SECTION_SIZE(TotalLength)
         CompressionSect.CompressionType = SectCompSubType
         CompressionSect.UncompressedLength = InputLength
     
-    OutFileBuffer = FileBuffer
+    Header = struct2stream(CompressionSect)
+    OutFileBuffer = OutFileBuffer.replace(OutFileBuffer[0:HeaderLength],Header)
     return EFI_SUCCESS
 
 
@@ -627,7 +639,7 @@ def GenSectionGuidDefinedSection(InputFileName:str,InputFileAlign:int,InputFileN
     
     FileBuffer = None
     InputLength = 0
-    Status = GetSectionContents(InputFileName,InputFileAlign,InputFileNum,FileBuffer,InputLength)
+    Status = GetSectionContents(InputFileName,InputFileAlign,InputFileNum,InputLength,FileBuffer)
     
     if Status == EFI_BUFFER_TOO_SMALL:
         if CompareGuid(VendorGuid,mZeroGuid) == 0:
@@ -644,7 +656,7 @@ def GenSectionGuidDefinedSection(InputFileName:str,InputFileAlign:int,InputFileN
             return EFI_OUT_OF_RESOURCES
         
         #Read all input file contents into a buffer
-        Status = GetSectionContents(InputFileName,InputFileAlign,InputFileNum,FileBuffer + Offset,InputLength)
+        Status = GetSectionContents(InputFileName,InputFileAlign,InputFileNum,InputLength,FileBuffer[Offset:])
     
     if EFI_ERROR(Status):
         return Status
@@ -734,7 +746,7 @@ def GenSectionSubtypeGuidSection(InputFileName:str,InputFileAlign:int,InputFileN
     
     #Read all input file contents into a buffer
     #first get the size of all file contents
-    Status = GetSectionContents(InputFileName,InputFileAlign,InputFileNum,FileBuffer,InputLength)
+    Status = GetSectionContents(InputFileName,InputFileAlign,InputFileNum,InputLength,FileBuffer)
     
     if Status == EFI_BUFFER_TOO_SMALL:
         Offset = sizeof(EFI_FREEFORM_SUBTYPE_GUID_SECTION)
@@ -744,7 +756,7 @@ def GenSectionSubtypeGuidSection(InputFileName:str,InputFileAlign:int,InputFileN
         
         #Read all input file contents into a buffer
         
-        Status = GetSectionContents(InputFileName,InputFileAlign,InputFileNum,FileBuffer,InputLength)
+        Status = GetSectionContents(InputFileName,InputFileAlign,InputFileNum,InputLength,FileBuffer)
     if EFI_ERROR(Status):
         logger.error("Error opening file for reading")
         return Status
