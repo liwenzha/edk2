@@ -4,6 +4,11 @@ from ctypes import *
 EFI_SUCCESS = 0
 EFI_OUT_OF_RESOURCES = 0x8000000000000000 | (9)
 EFI_BUFFER_TOO_SMALL = 0x8000000000000000 | (5)
+WNDBIT = 13
+WNDSIZ = 1 << WNDBIT
+THRESHOLD = 3
+mMatchPos = None
+
 
 mDst = None
 mDstUpperLimit = None
@@ -51,7 +56,34 @@ def MakeCrcTable():
 
 #The main controlling routine for compression process.
 def Encode() -> int:
-    pass
+    mText = b''
+    InitSlide()
+    HufEncodeStart()
+
+    mRemainder = FreadCrc(mText[WNDSIZ], WNDSIZ + 256)
+    mMatchLen = 0
+    mPos = WNDSIZ
+    InsertNode()
+    if mMatchLen > mRemainder:
+        mMatchLen = mRemainder
+    while mRemainder > 0:
+        LastMatchLen = mMatchLen
+        LastMatchPos = mMatchPos
+        GetNextMatch()
+        if mMatchLen > mRemainder:
+            mMatchLen = mRemainder
+
+        if mMatchLen > LastMatchLen or LastMatchLen < THRESHOLD:
+            Output(mText[mPos - 1], 0)
+        else:
+            Output(LastMatchLen + 0xff + 1 - THRESHOLD,(mPos - LastMatchPos - 2) & (WNDSIZ - 1))
+            while LastMatchLen - 1 > 0:
+                GetNextMatch()
+            if mMatchLen > mRemainder:
+                mMatchLen = mRemainder
+    
+    HufEncodeEnd()
+    return EFI_SUCCESS
 
 
 #The main compression routine.
