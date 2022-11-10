@@ -525,9 +525,8 @@ def GetSectionContents(InputFileName:str,InputFileAlign:int,InputFileNum:int,Buf
         #Now read the contents of the file into the buffer
         #Buffer must be enough to contain the file content.
         if FileSize > 0 and FileBuffer != None and ((Size + FileSize) <= BufferLength):
-            
-            
-            FileBuffer[Size:] = Data
+            FileBuffer = FileBuffer.replace(FileBuffer[Size:],Data)
+            #FileBuffer[Size:] = Data
         Size += FileSize
 
     #Set the real required buffer size.
