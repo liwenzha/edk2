@@ -8,6 +8,21 @@ WNDBIT = 13
 WNDSIZ = 1 << WNDBIT
 THRESHOLD = 3
 mMatchPos = None
+UINT8_MAX = 0xff
+MAX_HASH_VAL = 3 * WNDSIZ + (WNDSIZ / 512 + 1) * UINT8_MAX
+
+mLevel = b''
+mPosition = b''
+mParent = b''
+mNext = b''
+
+MAXMATCH = 256
+NC = UINT8_MAX + MAXMATCH + 2 - THRESHOLD
+NP = WNDBIT + 1
+mCFreq = []
+mPFreq = []
+UINT8_BIT = 8
+mSubBitBuf = None
 
 
 mDst = None
@@ -44,7 +59,7 @@ def PutDword(Data:int):
 
 
 def MakeCrcTable():
-    for i in range(0xff + 1):
+    for i in range(UINT8_MAX + 1):
         r = i
         for j in range(8):
             if r & 1:
@@ -53,6 +68,102 @@ def MakeCrcTable():
                 r >>= 1
         mCrcTable[i] = c_uint16(r)
 
+
+#Initialize String Info Log data structures
+def InitSlide():
+    for i in range(WNDSIZ, WNDSIZ + UINT8_MAX):
+        mLevel[i] = 1
+        mPosition[i] = 0
+        
+    for i in range(WNDSIZ, WNDSIZ*2):
+        mParent[i] = 0
+    mAvail = 1
+    
+    for i in range(WNDSIZ - 1):
+        mNext[i]  = i + 1
+        
+    mNext[WNDSIZ - 1] = 0
+    
+    for i in range(MAX_HASH_VAL+1):
+        mNext[i] = 0
+
+
+#Count the number of each code length for a Huffman tree
+def InitPutBits():
+    mBitCount = UINT8_BIT
+    mSubBitBuf = 0
+
+
+def HufEncodeStart():
+    for i in range(NC):
+        mCFreq[i] = 0
+    
+    for i in range(NP):
+        mPFreq[i] = 0
+        
+    mOutputPos = mOutputMask = 0
+    InitPutBits()
+
+
+def UPDATE_CRC(a):
+    mCrc = mCrcTable[(mCrc ^ (a)) & 0xFF] ^ (mCrc >> UINT8_BIT)
+    return mCrc
+
+
+#Read in source data
+def FreadCrc(p:int,n:int) -> int:
+    i = 0
+    while mSrc < mSrcUpperLimit and i < n:
+        p = mSrc
+        p += 1
+        mSrc += 1
+        i += 1
+    n = i
+    
+    p -= n
+    mOrigSize += n
+    while i - 1 >= 0:
+        UPDATE_CRC(p)
+        p += 1
+    return n
+
+
+#Insert string info for current position into the String Info Log
+def InsertNode():
+    
+    if mMatchLen >= 4:
+        mMatchLen -= 1
+        r = (mMatchPos + 1) | WNDSIZ
+        q = mParent[r]
+        while q == 0:
+            r = mNext[r]
+        while mLevel[q] >= mMatchLen:
+            r = q
+            q = mParent[q]
+        t = q
+        while mPosition[t] < 0:
+            mPosition[t] = mPos
+            t = mParent[t]
+        if t < WNDSIZ:
+            mPosition[t] = mPos | PERC_FLAG
+    else:
+         q = mText[mPos] + WNDSIZ
+         c = mText[mPos + 1]
+         r = Child(q, c)
+         if r == 0:
+             MakeChild(q, c, mPos)
+             mMatchLen = 1
+        mMatchLen = 2
+        
+    while True:
+        if r >= WNDSIZ:
+            j = MAXMATCH
+            mMatchPos = r
+        else:
+            j = mLevel[r]
+            mMatchPos = mPosition[r] & ~PERC_FLAG
+        if 
+              
 
 #The main controlling routine for compression process.
 def Encode() -> int:
@@ -76,7 +187,7 @@ def Encode() -> int:
         if mMatchLen > LastMatchLen or LastMatchLen < THRESHOLD:
             Output(mText[mPos - 1], 0)
         else:
-            Output(LastMatchLen + 0xff + 1 - THRESHOLD,(mPos - LastMatchPos - 2) & (WNDSIZ - 1))
+            Output(LastMatchLen + UINT8_MAX + 1 - THRESHOLD,(mPos - LastMatchPos - 2) & (WNDSIZ - 1))
             while LastMatchLen - 1 > 0:
                 GetNextMatch()
             if mMatchLen > mRemainder:
