@@ -151,8 +151,9 @@ def InsertNode():
          c = mText[mPos + 1]
          r = Child(q, c)
          if r == 0:
-             MakeChild(q, c, mPos)
-             mMatchLen = 1
+            MakeChild(q, c, mPos)
+            mMatchLen = 1
+            return
         mMatchLen = 2
         
     while True:
@@ -162,8 +163,48 @@ def InsertNode():
         else:
             j = mLevel[r]
             mMatchPos = mPosition[r] & ~PERC_FLAG
-        if 
-              
+        if mMatchPos >= mPos:
+            mMatchPos -= WNDSIZ
+        index1= mPos + mMatchLen
+        t1 = mText[index1]
+        index2 = mMatchPos + mMatchLen
+        t2 = mText[index2]
+        while mMatchLen < j:
+            if t1 != t2:
+                Split(r)
+                return
+            mMatchLen += 1
+            index1 += 1 
+            index2 += 1
+        if mMatchLen >= MAXMATCH:
+            break
+        mPosition[r] = mPos
+        q = r
+        r = Child(q, t1)
+        if r == 0:
+            MakeChild(q, *t1, mPos)
+            return
+        mMatchLen +=1
+        t = mPrev[r]
+        mPrev[mPos] = t
+        mNext[t] = mPos
+        t = mNext[r]
+        mNext[mPos] = t
+        mPrev[t] = mPos
+        mParent[mPos] = q
+        mParent[r] = 0
+
+        mNext[r] = mPos
+
+
+#Advance the current position (read in new data if needed).
+#Delete outdated string info. Find a match string for current position.
+def GetNextMatch():
+    mRemainder -= 1
+    if mPos + 1 == WNDSIZ * 2:
+        pass
+
+
 
 #The main controlling routine for compression process.
 def Encode() -> int:
