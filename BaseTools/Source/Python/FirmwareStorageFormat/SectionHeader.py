@@ -123,7 +123,7 @@ class EFI_FREEFORM_SUBTYPE_GUID_SECTION2(Structure):
     _pack_ = 1
     _fields_ = [
         ('CommonHeader',EFI_COMMON_SECTION_HEADER2)
-        ('SubTypeGuid',              GUID),
+        ('SubTypeGuid',              EFI_GUID),
     ]
 
 class EFI_GUID_DEFINED_SECTION(Structure):
