@@ -402,6 +402,23 @@ class EFI_IMAGE_DEBUG_DIRECTORY_ENTRY(Structure):
     ]
 
 
+class EFI_VERSION_SECTION(Structure):
+    _pack_ = 1
+    _fields_ = [
+        ('CommonHeader',EFI_COMMON_SECTION_HEADER),
+        ('BuildNumber',c_uint16),
+        ('VersionString',c_char)
+    ]
+    
+
+class EFI_USER_INTERFACE_SECTION(Structure):
+    _pack_ = 1
+    _fields_ = [
+        ('CommonHeader',EFI_COMMON_SECTION_HEADER),
+        ('FileNameString',c_char)
+    ]
+
+
 def Get_USER_INTERFACE_Header(nums: int):
     class EFI_SECTION_USER_INTERFACE(Structure):
         _pack_ = 1
