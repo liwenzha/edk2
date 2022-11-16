@@ -492,7 +492,7 @@ def GetSectionContents(InputFileNum:int,BufferLength:int,InputFileName=[],InputF
         #Make sure section ends on a DWORD boundary
         while Size & 0x03 != 0:
             if FileBuffer != None and Size < BufferLength:
-                FileBuffer = FileBuffer.replace(FileBuffer[Size].to_bytes(1,'little'),b'0')
+                FileBuffer = FileBuffer + b'0'
             Size += 1
             
         #Open file and read contents 
@@ -547,28 +547,23 @@ def GetSectionContents(InputFileNum:int,BufferLength:int,InputFileName=[],InputF
             if (InputFileAlign[Index] != 0 and (Size + HeaderSize + TeOffset) % InputFileAlign[Index]) != 0:
                 Offset = (Size + sizeof(EFI_COMMON_SECTION_HEADER)+ HeaderSize + TeOffset + InputFileAlign[Index] - 1) & ~ (InputFileAlign [Index] - 1)
                 Offset = Offset - Size - HeaderSize - TeOffset
+                Offset1 = Offset
 
                 #The maximal alignment is 64K, the raw section size must be less than 0xffffff
                 if FileBuffer != None and ((Size + Offset) < BufferLength):
-
-                    # str0 = b''
-                    # i = Offset
-                    # while i > 0:
-                    #     str0 = str0 + b'0'
-                    #     i = i - 1
-                    
-                    #FileBuffer = FileBuffer.replace(FileBuffer[Size - 1:Size + Offset],str0)
-                    #FileBuffer[Size:Size + Offset] = 0
-                    SectHeader = EFI_COMMON_SECTION_HEADER(FileBuffer[Size - 1:Size + sizeof(EFI_COMMON_SECTION_HEADER)])
+                    while Offset1 > 0:
+                        FileBuffer = FileBuffer + b'0'
+                        Offset1 -= 1
+                    SectHeader = EFI_COMMON_SECTION_HEADER(FileBuffer[Size:Size + sizeof(EFI_COMMON_SECTION_HEADER)])
                     SectHeader.Type = EFI_SECTION_RAW
                     SectHeader.SET_SECTION_SIZE(Offset)
+                    FileBuffer = FileBuffer.replace(FileBuffer[Size:Size + sizeof(EFI_COMMON_SECTION_HEADER)],struct2stream(SectHeader))
                 Size = Size + Offset
             
         #Now read the contents of the file into the buffer
         #Buffer must be enough to contain the file content.
         if FileSize > 0 and FileBuffer != None and ((Size + FileSize) <= BufferLength):
-            FileBuffer = FileBuffer.replace(FileBuffer[Size - 1:],Data)
-            #FileBuffer[Size:] = Data
+            FileBuffer = FileBuffer + Data
         Size += FileSize
 
     #Set the real required buffer size.
@@ -597,7 +592,6 @@ def GenSectionCompressionSection(InputFileNum:int,SectCompSubType:int,InputFileN
     Status = GetSectionContents(InputFileNum,InputLength,InputFileName,InputFileAlign,FileBuffer)
     
     if Status == EFI_BUFFER_TOO_SMALL:
-        
         #Read all input file contents into a buffer
         Status = GetSectionContents(InputFileNum,InputLength,InputFileName,InputFileAlign,FileBuffer)
     
@@ -619,9 +613,9 @@ def GenSectionCompressionSection(InputFileNum:int,SectCompSubType:int,InputFileN
         
         #Copy file buffer to the none compressed data
         OutputBuffer = b''
-        OutputBuffer = OutputBuffer.replace(OutputBuffer[(HeaderLength - 1):],FileBuffer)
+        OutputBuffer = FileBuffer
         #OutputBuffer[HeaderLength:] = FileBuffer
-        FileBuffer = OutputBuffer
+        #FileBuffer = OutputBuffer
         
     elif SectCompSubType == EFI_STANDARD_COMPRESSION:
         CompressFunction = COMPRESS_FUNCTION(EfiCompress[0:sizeof(COMPRESS_FUNCTION)])
@@ -638,7 +632,7 @@ def GenSectionCompressionSection(InputFileNum:int,SectCompSubType:int,InputFileN
             if CompressedLength + HeaderLength >= MAX_SECTION_SIZE:
                 HeaderLength = sizeof(EFI_COMPRESSION_SECTION2)
             TotalLength = CompressedLength + HeaderLength
-            Status = CompressFunction (FileBuffer, InputLength, OutputBuffer[(HeaderLength - 1):], CompressedLength)
+            Status = CompressFunction (FileBuffer, InputLength, OutputBuffer, CompressedLength)
             
         FileBuffer = OutputBuffer
             
@@ -650,23 +644,24 @@ def GenSectionCompressionSection(InputFileNum:int,SectCompSubType:int,InputFileN
     
     #Add the section header for the compressed data    
     if TotalLength >= MAX_SECTION_SIZE:
-        CompressionSect = EFI_COMPRESSION_SECTION2(FileBuffer[0:sizeof(EFI_COMPRESSION_SECTION2)])
-        CompressionSect.CommonHeader.Size[0] = 0xff
-        CompressionSect.CommonHeader.Size[1] = 0xff
-        CompressionSect.CommonHeader.Size[2] = 0xff
+        CompressionSect2 = EFI_COMPRESSION_SECTION2()
+        CompressionSect2.CommonHeader.Size[0] = 0xff
+        CompressionSect2.CommonHeader.Size[1] = 0xff
+        CompressionSect2.CommonHeader.Size[2] = 0xff
         
-        CompressionSect.CommonHeader.Type = EFI_SECTION_COMPRESSION
-        CompressionSect.CommonHeader.ExtendedSize = TotalLength
-        CompressionSect.CompressionType = SectCompSubType
-        CompressionSect.UncompressedLength = InputLength
+        CompressionSect2.CommonHeader.Type = EFI_SECTION_COMPRESSION
+        CompressionSect2.CommonHeader.ExtendedSize = TotalLength
+        CompressionSect2.CompressionType = SectCompSubType
+        CompressionSect2.UncompressedLength = InputLength
+        FileBuffer = struct2stream(CompressionSect2) + FileBuffer
     else:
-        CompressionSect = EFI_COMPRESSION_SECTION(FileBuffer[0:sizeof(EFI_COMPRESSION_SECTION)])
+        CompressionSect = EFI_COMPRESSION_SECTION()
         CompressionSect.CommonHeader.Type = EFI_SECTION_COMPRESSION
         CompressionSect.CommonHeader.SET_SECTION_SIZE(TotalLength)
         CompressionSect.CompressionType = SectCompSubType
         CompressionSect.UncompressedLength = InputLength
+        FileBuffer = struct2stream(CompressionSect) + FileBuffer
     
-    #Header = struct2stream(CompressionSect)
     OutFileBuffer = FileBuffer
     return EFI_SUCCESS
 
@@ -698,10 +693,11 @@ def GenSectionGuidDefinedSection(InputFileNum:int,VendorGuid:EFI_GUID,DataAttrib
         TotalLength = InputLength + Offset
         
         if FileBuffer == None:
+            logger.error("Resource, memory cannot be allocated")
             return EFI_OUT_OF_RESOURCES
         
         #Read all input file contents into a buffer
-        Status = GetSectionContents(InputFileNum,InputLength,InputFileName,InputFileAlign,FileBuffer[Offset:])
+        Status = GetSectionContents(InputFileNum,InputLength,InputFileName,InputFileAlign,FileBuffer)
     
     if EFI_ERROR(Status):
         logger.error("Error opening file for reading")
@@ -716,10 +712,10 @@ def GenSectionGuidDefinedSection(InputFileNum:int,VendorGuid:EFI_GUID,DataAttrib
         logger.error("Memory cannot be allocated")
         return EFI_OUT_OF_RESOURCES
     
-    #Now data is in FileBuffer + Offset
+    #Now data is in FileBuffer
     if CompareGuid(VendorGuid, mZeroGuid) == 0:
         #Defalut Guid section is CRC32
-        Crc32InputFileContent = FileBuffer[(Offset - 1):]
+        Crc32InputFileContent = FileBuffer
         Crc32Input ='InputFile'
         Crc32Output='OutPutFile'
         with open(Crc32Input,'rb') as Input:
@@ -728,7 +724,7 @@ def GenSectionGuidDefinedSection(InputFileNum:int,VendorGuid:EFI_GUID,DataAttrib
         Crc32Checksum = int.from_bytes(byteorder='little')
         
         if TotalLength >= MAX_SECTION_SIZE:
-            Crc32GuidSect2 = CRC32_SECTION_HEADER2(FileBuffer[0:sizeof(CRC32_SECTION_HEADER2)])
+            Crc32GuidSect2 = CRC32_SECTION_HEADER2()
             Crc32GuidSect2.GuidSectionHeader.CommonHeader.Type = EFI_SECTION_GUID_DEFINED
             Crc32GuidSect2.GuidSectionHeader.CommonHeader.Size[0] = 0xff
             Crc32GuidSect2.GuidSectionHeader.CommonHeader.Size[1] = 0xff
@@ -738,19 +734,19 @@ def GenSectionGuidDefinedSection(InputFileNum:int,VendorGuid:EFI_GUID,DataAttrib
             Crc32GuidSect2.GuidSectionHeader.Attributes = EFI_GUIDED_SECTION_AUTH_STATUS_VALID
             Crc32GuidSect2.GuidSectionHeader.DataOffset = sizeof (CRC32_SECTION_HEADER2)
             Crc32GuidSect2.CRC32Checksum = Crc32Checksum
-            #FileBuffer = struct2stream(Crc32GuidSect2) + FileBuffer
+            FileBuffer = struct2stream(Crc32GuidSect2) + FileBuffer
         else:
-            Crc32GuidSect = CRC32_SECTION_HEADER(FileBuffer[0:sizeof(CRC32_SECTION_HEADER)])
+            Crc32GuidSect = CRC32_SECTION_HEADER()
             Crc32GuidSect.GuidSectionHeader.CommonHeader.Type = EFI_SECTION_GUID_DEFINED
             Crc32GuidSect.GuidSectionHeader.CommonHeader.SET_SECTION_SIZE(TotalLength)
             Crc32GuidSect.GuidSectionHeader.SectionDefinitionGuid = mEfiCrc32SectionGuid
             Crc32GuidSect.GuidSectionHeader.Attributes = EFI_GUIDED_SECTION_AUTH_STATUS_VALID
             Crc32GuidSect.GuidSectionHeader.DataOffset = sizeof (CRC32_SECTION_HEADER)
             Crc32GuidSect.CRC32Checksum = Crc32Checksum
-            #FileBuffer = struct2stream(Crc32GuidSect) + FileBuffer
+            FileBuffer = struct2stream(Crc32GuidSect) + FileBuffer
     else:
         if TotalLength >= MAX_SECTION_SIZE:
-            VendorGuidSect2 = EFI_GUID_DEFINED_SECTION2(FileBuffer[0:sizeof(EFI_GUID_DEFINED_SECTION2)])
+            VendorGuidSect2 = EFI_GUID_DEFINED_SECTION2()
             VendorGuidSect2.CommonHeader.Type = EFI_SECTION_GUID_DEFINED
             VendorGuidSect2.CommonHeader.Size[0] = 0xff
             VendorGuidSect2.CommonHeader.Size[1] = 0xff
@@ -759,15 +755,15 @@ def GenSectionGuidDefinedSection(InputFileNum:int,VendorGuid:EFI_GUID,DataAttrib
             VendorGuidSect2.SectionDefinitionGuid = VendorGuid
             VendorGuidSect2.Attributes = DataAttribute
             VendorGuidSect2.DataOffset = sizeof (EFI_GUID_DEFINED_SECTION2) + DataHeaderSize
-            #FileBuffer = struct2stream(VendorGuidSect2) + FileBuffer
+            FileBuffer = struct2stream(VendorGuidSect2) + FileBuffer
         else:
-            VendorGuidSect = EFI_GUID_DEFINED_SECTION(FileBuffer[0:sizeof(EFI_GUID_DEFINED_SECTION)])
+            VendorGuidSect = EFI_GUID_DEFINED_SECTION()
             VendorGuidSect.CommonHeader.Type = EFI_SECTION_GUID_DEFINED
             VendorGuidSect.CommonHeader.SET_SECTION_SIZE(TotalLength)
             VendorGuidSect.SectionDefinitionGuid = VendorGuid
             VendorGuidSect.Attributes = DataAttribute
             VendorGuidSect.DataOffset = sizeof (EFI_GUID_DEFINED_SECTION) + DataHeaderSize
-            #FileBuffer = struct2stream(VendorGuidSect) + FileBuffer
+            FileBuffer = struct2stream(VendorGuidSect) + FileBuffer
 
     OutFileBuffer = FileBuffer
     return EFI_SUCCESS
@@ -819,22 +815,22 @@ def GenSectionSubtypeGuidSection(InputFileNum:int,SubTypeGuid:EFI_GUID,
         logger.error("Resource, memory cannot be allocated")
         return EFI_OUT_OF_RESOURCES
     
-    #Now data is in FileBuffer + Offset
+    #Now data is in FileBuffer
     if TotalLength >= MAX_SECTION_SIZE:
-        SubtypeGuidSect2 = EFI_FREEFORM_SUBTYPE_GUID_SECTION2(FileBuffer[0:sizeof(EFI_FREEFORM_SUBTYPE_GUID_SECTION2)])
+        SubtypeGuidSect2 = EFI_FREEFORM_SUBTYPE_GUID_SECTION2()
         SubtypeGuidSect2.CommonHeader = EFI_SECTION_FREEFORM_SUBTYPE_GUID
         SubtypeGuidSect2.CommonHeader.Size[0] = 0xff
         SubtypeGuidSect2.CommonHeader.Size[1] = 0xff
         SubtypeGuidSect2.CommonHeader.Size[2] = 0xff
         SubtypeGuidSect2.CommonHeader.ExtendedSize = InputLength + sizeof(EFI_FREEFORM_SUBTYPE_GUID_SECTION2)
         SubtypeGuidSect2.SubTypeGuid = SubTypeGuid
-        #FileBuffer = struct2stream(SubtypeGuidSect2) + FileBuffer
+        FileBuffer = struct2stream(SubtypeGuidSect2) + FileBuffer
     else:
-        SubtypeGuidSect = EFI_FREEFORM_SUBTYPE_GUID_SECTION(FileBuffer[0:sizeof(EFI_FREEFORM_SUBTYPE_GUID_SECTION)])
+        SubtypeGuidSect = EFI_FREEFORM_SUBTYPE_GUID_SECTION()
         SubtypeGuidSect.CommonHeader.Type = EFI_SECTION_FREEFORM_SUBTYPE_GUID
         SubtypeGuidSect.CommonHeader.SET_SECTION_SIZE(TotalLength)
         SubtypeGuidSect2.SubTypeGuid = SubTypeGuid
-        #FileBuffer = struct2stream(SubtypeGuidSect) + FileBuffer
+        FileBuffer = struct2stream(SubtypeGuidSect) + FileBuffer
 
     OutFileBuffer =FileBuffer
     return EFI_SUCCESS
