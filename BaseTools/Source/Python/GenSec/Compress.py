@@ -28,22 +28,24 @@ mSrc = None
 mDst = None
 mSrcUpperLimit = None
 mDstUpperLimit = None
-mLevel = b''
+mLevel = []
 mCLen = []*NC
 mCCode = []*NC
 mTFreq = []*(2 * NT - 1)
+mLen = []
 mPTLen = []*NPT
 mPTCode = []*NPT
 mHeap = []*(NC + 1)
 mLeft = []*(2 * NC - 1)
 mRight = []*(2 * NC - 1)
 mLenCnt = [] * 17
-mText = b''
-mChildCount = b''
-mBuf = b''
+mText = []
+mChildCount = []
+mBuf = []
 mMatchLen = None
 mBufSiz = 0
 mFreq = []
+mN = None
 
 mCFreq = []
 mCrcTable = []
@@ -51,10 +53,10 @@ mPFreq = []
 mPos =None
 mMatchPos = None
 mAvail =None
-mPosition = b''
-mParent = b''
-mNext = b''
-mPrev = b''
+mPosition = []
+mParent = []
+mNext = []
+mPrev = []
 mHeapSize = None
 
 INIT_CRC = 0
@@ -335,8 +337,41 @@ def DownHeap(i:c_uint32):
     mHeap[i] = k
 
 
-def MakeLen():
-    pass
+#Count the number of each code length for a Huffman tree.
+def CountLen(i:c_int32):
+    if i < mN:
+        mLenCnt[Depth if Depth < 16 else 16] += 1
+    else:
+        Depth += 1
+        CountLen(mLeft [i])
+        CountLen(mRight[i])
+        Depth -= 1
+
+#Create code length array for a Huffman tree
+def MakeLen(Root:c_int32):
+    for i in range(16):
+        mLenCnt[i] = 0
+    CountLen(Root)
+
+    #Adjust the length count array so that
+    #no code will be generated longer than its designated length
+    Cum = 0
+    for i in range(15,0,-1):
+        Cum += mLenCnt[i] << (16 - i)
+    while Cum != (1 << 16):
+        mLenCnt[16] -= 1
+        for i in range(15,0,-1):
+            mLenCnt[16] -= 1
+            if mLenCnt[i] != 0:
+                mLenCnt[i] -= 1
+                mLenCnt[i+1] += 2
+                break
+        Cum -= 1
+    for i in range(16,0,-1):
+        k = mLenCnt[i]
+        while ( k - 1 >= 0):
+            mLen[mSortPtr] = i
+            mSortPtr += 1
 
 
 def MakeCode(n:c_int32,Len:c_uint8=[],Code:c_uint16  =[]):
@@ -364,7 +399,7 @@ def MakeTree(NParm:c_int32,FreqParm:c_uint16 = [],LenParm:c_uint8 = [],CodeParm:
     if mHeapSize < 2:
         CodeParm[mHeap[1]] = 0
         return mHeap[1]
-    for i in range(mHeapSize / 2, 1,-1):
+    for i in range(mHeapSize / 2 , 0,-1):
         #Make priority queue
         DownHeap(i)
     mSortPtr = CodeParm
@@ -570,7 +605,6 @@ def HufEncodeEnd():
 
 #The main controlling routine for compression process.
 def Encode() -> int:
-    mText = b''
     InitSlide()
     HufEncodeStart()
 
