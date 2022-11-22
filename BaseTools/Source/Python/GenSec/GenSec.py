@@ -241,7 +241,7 @@ def PeCoffLoaderGetImageInfo(ImageContext:PE_COFF_LOADER_IMAGE_CONTEXT) -> int:
     
     if (ImageContext.IsTeImage == 0) and (PeHdr.Pe32.FileHeader.Characteristics & EFI_IMAGE_FILE_RELOCS_STRIPPED) != 0:
         ImageContext.RelocationsStripped = True
-    elif ImageContext.IsTeImage is not 0 and TeHdr.DataDirectory[0].Size is 0 and TeHdr.DataDirectory[0].VirtualAddress == 0:
+    elif ImageContext.IsTeImage != 0 and TeHdr.DataDirectory[0].Size == 0 and TeHdr.DataDirectory[0].VirtualAddress == 0:
         ImageContext.RelocationsStripped = True
     else:
         ImageContext.RelocationsStripped = False
@@ -490,8 +490,17 @@ def StringToGuid(AsciiGuidBuffer:str,GuidBuffer:EFI_GUID):
 
 
 
-mZeroGuid = EFI_GUID({0x0, 0x0, 0x0, {0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0}})
-mEfiCrc32SectionGuid = EFI_GUID({0xFC1BCDB0, 0x7D31, 0x49aa, {0x93, 0x6A, 0xA4, 0x60, 0x0D, 0x9D, 0xD0, 0x83}})
+mZeroGuid = EFI_GUID()
+mZeroGuid.Data1 = 0x0
+mZeroGuid.Data2 = 0x0
+mZeroGuid.Data3 = 0x0
+mZeroGuid.Data4 = (0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0)
+
+mEfiCrc32SectionGuid = EFI_GUID()
+mEfiCrc32SectionGuid.Data1 = 0xFC1BCDB0
+mEfiCrc32SectionGuid.Data2 = 0x7D31
+mEfiCrc32SectionGuid.Data3 = 0x49aa
+mEfiCrc32SectionGuid.Data4 = (0x93, 0x6A, 0xA4, 0x60, 0x0D, 0x9D, 0xD0, 0x83)
 
 
 parser=argparse.ArgumentParser(description="Create Firmware File Section files  per PI Spec")
@@ -524,7 +533,7 @@ parser.add_argument("-q","--quiet",dest="quiet",help="Disable all messages excep
 parser.add_argument("-d","--debug",dest="debug_level",help="Enable debug messages, at input debug level.")
 parser.add_argument("--version", action="version", version='%(prog)s Version 1.0',
                     help="Show program's version number and exit.")
-parser.add_argument("-h","--help",dest="help",help="Show this help message and exit.")
+#parser.add_argument("-h","--help",dest="help",help="Show this help message and exit.")
 
 
 #Write ascii string as unicode string format to FILE
@@ -642,24 +651,22 @@ def GetSectionContents(InputFileNum:int,BufferLength:int,InputFileName=[],InputF
             else:
                 HeaderSize = sizeof(EFI_COMMON_SECTION_HEADER)
                 
-            TempSectHeader = EFI_COMMON_SECTION_HEADER2(Data[0:HeaderSize])
+            TempSectHeader = EFI_COMMON_SECTION_HEADER2.from_buffer_copy(Data[0:sizeof(HeaderSize)])
             
             if TempSectHeader.Type == EFI_SECTION_TE:
                 #Header = EFI_TE_IMAGE_HEADER()
                 TeHeaderSize = sizeof(EFI_TE_IMAGE_HEADER)
-                TeHeader = EFI_TE_IMAGE_HEADER(Data[0:TeHeaderSize])
+                TeHeader = EFI_TE_IMAGE_HEADER.from_buffer_copy(Data[0:TeHeaderSize])
                 if TeHeader.Signature == EFI_TE_IMAGE_HEADER_SIGNATURE:
                     TeOffset = TeHeader.StrippedSize - sizeof(TeHeader)
 
             elif TempSectHeader.Type == EFI_SECTION_GUID_DEFINED:
                 if FileSize >= MAX_SECTION_SIZE:
-
-                    GuidSectHeader2 = EFI_GUID_DEFINED_SECTION2(Data[0:sizeof(EFI_GUID_DEFINED_SECTION2)])
+                    GuidSectHeader2 = EFI_GUID_DEFINED_SECTION2.from_buffer_copy(Data[0:sizeof(EFI_GUID_DEFINED_SECTION2)])
                     if GuidSectHeader2.Attributes & EFI_GUIDED_SECTION_PROCESSING_REQUIRED == 0:
                         HeaderSize = GuidSectHeader2.DataOffset
                 else:
-                    
-                    GuidSectHeader = EFI_GUID_DEFINED_SECTION(Data[0:sizeof(GuidSectHeader)])
+                    GuidSectHeader = EFI_GUID_DEFINED_SECTION.from_buffer_copy(Data[0:sizeof(EFI_GUID_DEFINED_SECTION)])
                     if GuidSectHeader.Attributes & EFI_GUIDED_SECTION_PROCESSING_REQUIRED == 0:
                         HeaderSize = GuidSectHeader.DataOffset
         
@@ -677,13 +684,14 @@ def GetSectionContents(InputFileNum:int,BufferLength:int,InputFileName=[],InputF
 
                 #The maximal alignment is 64K, the raw section size must be less than 0xffffff
                 if FileBuffer != None and ((Size + Offset) < BufferLength):
-                    while Offset1 > 0:
-                        FileBuffer = FileBuffer + b'0'
-                        Offset1 -= 1
-                    SectHeader = EFI_COMMON_SECTION_HEADER(FileBuffer[Size:Size + sizeof(EFI_COMMON_SECTION_HEADER)])
+                    # while Offset1 > 0:
+                    #     FileBuffer = FileBuffer + b'0'
+                    #     Offset1 -= 1
+                    SectHeader = EFI_COMMON_SECTION_HEADER()
                     SectHeader.Type = EFI_SECTION_RAW
                     SectHeader.SET_SECTION_SIZE(Offset)
-                    FileBuffer = FileBuffer.replace(FileBuffer[Size:Size + sizeof(EFI_COMMON_SECTION_HEADER)],struct2stream(SectHeader))
+                    #FileBuffer = FileBuffer.replace(FileBuffer[Size:Size + sizeof(EFI_COMMON_SECTION_HEADER)],struct2stream(SectHeader))
+                    FileBuffer = struct2stream(SectHeader)
                 Size = Size + Offset
             
         #Now read the contents of the file into the buffer
@@ -715,6 +723,7 @@ def GenSectionCompressionSection(InputFileNum:int,SectCompSubType:int,InputFileN
     
     FileBuffer = b''
     InputLength = 0
+    CompressedLength = 0
     Status = GetSectionContents(InputFileNum,InputLength,InputFileName,InputFileAlign,FileBuffer)
     
     if Status == EFI_BUFFER_TOO_SMALL:
@@ -731,10 +740,10 @@ def GenSectionCompressionSection(InputFileNum:int,SectCompSubType:int,InputFileN
     if SectCompSubType == EFI_NOT_COMPRESSED:
         CompressedLength = InputLength
         HeaderLength = sizeof(EFI_COMPRESSION_SECTION)
-        Header = EFI_COMPRESSION_SECTION()
+        #Header = EFI_COMPRESSION_SECTION()
         if CompressedLength + HeaderLength >= MAX_SECTION_SIZE:
             HeaderLength = sizeof(EFI_COMPRESSION_SECTION2)
-            Header = EFI_COMPRESSION_SECTION2()
+            #Header = EFI_COMPRESSION_SECTION2()
         TotalLength = CompressedLength + HeaderLength
         
         #Copy file buffer to the none compressed data
@@ -744,7 +753,7 @@ def GenSectionCompressionSection(InputFileNum:int,SectCompSubType:int,InputFileN
         #FileBuffer = OutputBuffer
         
     elif SectCompSubType == EFI_STANDARD_COMPRESSION:
-        CompressFunction = COMPRESS_FUNCTION(EfiCompress[0:sizeof(COMPRESS_FUNCTION)])
+        CompressFunction = COMPRESS_FUNCTION(int(EfiCompress[0:sizeof(COMPRESS_FUNCTION)]))
         
     else:
         logger.error("Invalid parameter, unknown compression type")
@@ -991,7 +1000,7 @@ def GetAlignmentFromFile(InFile:str,Alignment:int = 0) -> int:
     PeFileSize = len(Data)
     PeFileBuffer = Data
     
-    CommonHeader = EFI_COMMON_SECTION_HEADER(PeFileBuffer[0:(sizeof(EFI_COMMON_SECTION_HEADER)):])
+    CommonHeader = EFI_COMMON_SECTION_HEADER(int(PeFileBuffer[0:(sizeof(EFI_COMMON_SECTION_HEADER))]))
     CurSecHdrSize = sizeof(CommonHeader)
     ImageContext = PE_COFF_LOADER_IMAGE_CONTEXT()
     ImageContext.Handle =  PeFileBuffer[CurSecHdrSize:]
