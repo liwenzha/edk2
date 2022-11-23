@@ -205,12 +205,15 @@ def PeCoffLoaderGetImageInfo(ImageContext:PE_COFF_LOADER_IMAGE_CONTEXT) -> int:
     DebugDirectoryEntry = EFI_IMAGE_DATA_DIRECTORY()
     SectionHeader = EFI_IMAGE_SECTION_HEADER()
     DebugEntry = EFI_IMAGE_DEBUG_DIRECTORY_ENTRY()
+    OptionHeader = EFI_IMAGE_OPTIONAL_HEADER_POINTER()
+    DebugDirectoryEntryRva = 0
     
     if ImageContext == None:
         return RETURN_INVALID_PARAMETER
     
     #Assume success
     ImageContext.ImageError = IMAGE_ERROR_SUCCESS
+    
     Status = PeCoffLoaderGetPeHeader(ImageContext,PeHdr,TeHdr)
     if RETURN_ERROR(Status):
         return Status
@@ -219,7 +222,6 @@ def PeCoffLoaderGetImageInfo(ImageContext:PE_COFF_LOADER_IMAGE_CONTEXT) -> int:
     Status = PeCoffLoaderCheckImageType(ImageContext,PeHdr,TeHdr)
     if RETURN_ERROR(Status):
         return Status
-    OptionHeader = EFI_IMAGE_OPTIONAL_HEADER_POINTER()
     OptionHeader.Header = PeHdr.Pe32.OptionalHeader
     
     #Retrieve the base address of the image
@@ -253,7 +255,7 @@ def PeCoffLoaderGetImageInfo(ImageContext:PE_COFF_LOADER_IMAGE_CONTEXT) -> int:
             ImageContext.SizeOfHeaders = OptionHeader.Optional32.SizeOfHeaders
             
             if OptionHeader.Optional32.NumberOfRvaAndSizes > EFI_IMAGE_DIRECTORY_ENTRY_DEBUG:
-                DebugDirectoryEntry = EFI_IMAGE_DATA_DIRECTORY(OptionHeader.Optional32.DataDirectory[EFI_IMAGE_DIRECTORY_ENTRY_DEBUG:])
+                DebugDirectoryEntry = EFI_IMAGE_DATA_DIRECTORY(OptionHeader.Optional32.DataDirectory[EFI_IMAGE_DIRECTORY_ENTRY_DEBUG])
                 DebugDirectoryEntryRva = DebugDirectoryEntry.VirtualAddress
         else:
             ImageContext.ImageSize = OptionHeader.Optional64.SizeOfImage
@@ -261,7 +263,7 @@ def PeCoffLoaderGetImageInfo(ImageContext:PE_COFF_LOADER_IMAGE_CONTEXT) -> int:
             ImageContext.SizeOfHeaders = OptionHeader.Optional64.SizeOfHeaders
             
             if OptionHeader.Optional64.NumberOfRvaAndSizes > EFI_IMAGE_DIRECTORY_ENTRY_DEBUG:
-                DebugDirectoryEntry = EFI_IMAGE_DATA_DIRECTORY(OptionHeader.Optional64.DataDirectory[EFI_IMAGE_DIRECTORY_ENTRY_DEBUG:])
+                DebugDirectoryEntry = EFI_IMAGE_DATA_DIRECTORY(OptionHeader.Optional64.DataDirectory[EFI_IMAGE_DIRECTORY_ENTRY_DEBUG])
                 DebugDirectoryEntryRva = DebugDirectoryEntry.VirtualAddress
                 
         if DebugDirectoryEntryRva != 0:
@@ -651,22 +653,26 @@ def GetSectionContents(InputFileNum:int,BufferLength:int,InputFileName=[],InputF
             else:
                 HeaderSize = sizeof(EFI_COMMON_SECTION_HEADER)
                 
-            TempSectHeader = EFI_COMMON_SECTION_HEADER2.from_buffer_copy(Data[0:sizeof(HeaderSize)])
+            #TempSectHeader = EFI_COMMON_SECTION_HEADER2.from_buffer_copy(Data[0:sizeof(HeaderSize)])
+            TempSectHeader = EFI_COMMON_SECTION_HEADER2.from_buffer_copy(Data)
             
             if TempSectHeader.Type == EFI_SECTION_TE:
                 #Header = EFI_TE_IMAGE_HEADER()
                 TeHeaderSize = sizeof(EFI_TE_IMAGE_HEADER)
-                TeHeader = EFI_TE_IMAGE_HEADER.from_buffer_copy(Data[0:TeHeaderSize])
+                #TeHeader = EFI_TE_IMAGE_HEADER.from_buffer_copy(Data[0:TeHeaderSize])
+                TeHeader = EFI_TE_IMAGE_HEADER.from_buffer_copy(Data)
                 if TeHeader.Signature == EFI_TE_IMAGE_HEADER_SIGNATURE:
                     TeOffset = TeHeader.StrippedSize - sizeof(TeHeader)
 
             elif TempSectHeader.Type == EFI_SECTION_GUID_DEFINED:
                 if FileSize >= MAX_SECTION_SIZE:
-                    GuidSectHeader2 = EFI_GUID_DEFINED_SECTION2.from_buffer_copy(Data[0:sizeof(EFI_GUID_DEFINED_SECTION2)])
+                    #GuidSectHeader2 = EFI_GUID_DEFINED_SECTION2.from_buffer_copy(Data[0:sizeof(EFI_GUID_DEFINED_SECTION2)])
+                    GuidSectHeader2 = EFI_GUID_DEFINED_SECTION2.from_buffer_copy(Data)
                     if GuidSectHeader2.Attributes & EFI_GUIDED_SECTION_PROCESSING_REQUIRED == 0:
                         HeaderSize = GuidSectHeader2.DataOffset
                 else:
-                    GuidSectHeader = EFI_GUID_DEFINED_SECTION.from_buffer_copy(Data[0:sizeof(EFI_GUID_DEFINED_SECTION)])
+                    #GuidSectHeader = EFI_GUID_DEFINED_SECTION.from_buffer_copy(Data[0:sizeof(EFI_GUID_DEFINED_SECTION)])
+                    GuidSectHeader = EFI_GUID_DEFINED_SECTION.from_buffer_copy(Data)
                     if GuidSectHeader.Attributes & EFI_GUIDED_SECTION_PROCESSING_REQUIRED == 0:
                         HeaderSize = GuidSectHeader.DataOffset
         
@@ -976,11 +982,11 @@ def FfsRebaseImageRead(FileOffset:int,ReadSize:int,FileHandle = b'',Buffer = b''
     Destination8 = Buffer
     Source8 = FileHandle[FileOffset:]
     Length = ReadSize
-    while Length:
+    while Length - 1:
         Destination8 = Source8 
         Destination8 += 1
         Source8 += 1
-        Length -= 1
+        #Length -= 1
     return EFI_SUCCESS
 
 
@@ -1000,11 +1006,11 @@ def GetAlignmentFromFile(InFile:str,Alignment:int = 0) -> int:
     PeFileSize = len(Data)
     PeFileBuffer = Data
     
-    CommonHeader = EFI_COMMON_SECTION_HEADER(int(PeFileBuffer[0:(sizeof(EFI_COMMON_SECTION_HEADER))]))
+    CommonHeader = EFI_COMMON_SECTION_HEADER.from_buffer_copy(PeFileBuffer)
     CurSecHdrSize = sizeof(CommonHeader)
     ImageContext = PE_COFF_LOADER_IMAGE_CONTEXT()
     ImageContext.Handle =  PeFileBuffer[CurSecHdrSize:]
-    ImageContext.ImageRead = PE_COFF_LOADER_READ_FILE(FfsRebaseImageRead[0:sizeof(PE_COFF_LOADER_READ_FILE)])
+    ImageContext.ImageRead = PE_COFF_LOADER_READ_FILE(FfsRebaseImageRead)
     Status = PeCoffLoaderGetImageInfo(ImageContext)
     if EFI_ERROR(Status):
         logger.error("Invalid PeImage,he input file is %s and return status is %x",InFile,Status)
@@ -1026,6 +1032,9 @@ def main():
     InputLength = 0
     OutFileBuffer = b''
     VendorGuid = mZeroGuid
+    SectType = EFI_SECTION_ALL
+    SectGuidAttribute = EFI_GUIDED_SECTION_NONE
+    Status = STATUS_SUCCESS
     
     args = parser.parse_args()
     argc = len(sys.argv)
