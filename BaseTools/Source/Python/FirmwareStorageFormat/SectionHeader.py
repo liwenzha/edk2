@@ -112,7 +112,7 @@ class EFI_FREEFORM_SUBTYPE_GUID_SECTION(Structure):
     _pack_ = 1
     _fields_ = [
         ('CommonHeader',EFI_COMMON_SECTION_HEADER)
-        ('SubTypeGuid',              GUID),
+        ('SubTypeGuid',              EFI_GUID),
     ]
 
     def ExtHeaderSize(self) -> int:
@@ -177,10 +177,10 @@ class EFI_TE_IMAGE_HEADER(Structure):
 
 class PE_COFF_LOADER_READ_FILE(Structure):
     _pack_=  1
-    _fields_ =[('FileHandle',None),
-               ('FileOffset',c_uint64),
+    _fields_ =[('FileOffset',c_uint64),
                ('ReadSize',c_uint64),
-               ('Buffer',None)]
+               ('FileHandle',b''),
+               ('Buffer',b'')]
 
 
 class PE_COFF_LOADER_IMAGE_CONTEXT(Structure):
@@ -190,12 +190,12 @@ class PE_COFF_LOADER_IMAGE_CONTEXT(Structure):
                ('DestinationAddress',PHYSICAL_ADDRESS),
                ('EntryPoint',PHYSICAL_ADDRESS),
                ('ImageRead',PE_COFF_LOADER_READ_FILE),
-               ('Handle',None),
-               ('FixupData',None),
+               ('Handle',b''),
+               ('FixupData',b''),
                ('SectionAlignment',c_uint32),
                ('PeCoffHeaderOffset',c_uint32),
                ('DebugDirectoryEntryRva',c_uint32),
-               ('CodeView',None),
+               ('CodeView',c_int),
                ('PdbPointer',c_char),
                ('SizeOfHeaders',c_uint64),
                ('ImageCodeMemoryType',c_uint32),
