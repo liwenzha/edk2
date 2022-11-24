@@ -492,11 +492,11 @@ def StringToGuid(AsciiGuidBuffer:str,GuidBuffer:EFI_GUID):
 
 
 
-mZeroGuid = EFI_GUID()
-mZeroGuid.Data1 = 0x0
-mZeroGuid.Data2 = 0x0
-mZeroGuid.Data3 = 0x0
-mZeroGuid.Data4 = (0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0)
+mZeroGuid = EFI_GUID(0x0,0x0,0x0,(0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0))
+# mZeroGuid.Data1 = 0x0
+# mZeroGuid.Data2 = 0x0
+# mZeroGuid.Data3 = 0x0
+# mZeroGuid.Data4 = (0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0)
 
 mEfiCrc32SectionGuid = EFI_GUID()
 mEfiCrc32SectionGuid.Data1 = 0xFC1BCDB0
@@ -513,7 +513,7 @@ parser.add_argument("-s","--sectiontype",dest="SectionType",help="SectionType de
                     EFI_SECTION_USER_INTERFACE, EFI_SECTION_VERSION,EFI_SECTION_FIRMWARE_VOLUME_IMAGE, EFI_SECTION_RAW,\
                     EFI_SECTION_FREEFORM_SUBTYPE_GUID,EFI_SECTION_PEI_DEPEX, EFI_SECTION_SMM_DEPEX. if -s option is not given,\
                     EFI_SECTION_ALL is default section type.")
-parser.add_argument("-c","--compress",dest="Type",help="Compress method type can be PI_NONE or PI_STD.\
+parser.add_argument("-c","--compress",dest="Compress",help="Compress method type can be PI_NONE or PI_STD.\
                     if -c option is not given, PI_STD is default type.")
 parser.add_argument("-g","--vendor",dest="GuidValue",help="GuidValue is one specific vendor guid value.\
                     Its format is xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx")
@@ -535,7 +535,6 @@ parser.add_argument("-q","--quiet",dest="quiet",help="Disable all messages excep
 parser.add_argument("-d","--debug",dest="debug_level",help="Enable debug messages, at input debug level.")
 parser.add_argument("--version", action="version", version='%(prog)s Version 1.0',
                     help="Show program's version number and exit.")
-#parser.add_argument("-h","--help",dest="help",help="Show this help message and exit.")
 
 
 #Write ascii string as unicode string format to FILE
@@ -589,8 +588,6 @@ def GenSectionCommonLeafSection(SectionType:int,InputFileNum:int,InputFileName=[
     CommonSect.Type = SectionType
         
     #Write result into outputfile
-    # with open(OutFileBuffer, 'wb') as OutFile:
-    #     OutFile.write(struct2stream(CommonSect)) + OutFile.write(Data)
     OutFileBuffer = struct2stream(CommonSect) + Data
     status = STATUS_SUCCESS
     return status
@@ -659,19 +656,16 @@ def GetSectionContents(InputFileNum:int,BufferLength:int,InputFileName=[],InputF
             if TempSectHeader.Type == EFI_SECTION_TE:
                 #Header = EFI_TE_IMAGE_HEADER()
                 TeHeaderSize = sizeof(EFI_TE_IMAGE_HEADER)
-                #TeHeader = EFI_TE_IMAGE_HEADER.from_buffer_copy(Data[0:TeHeaderSize])
                 TeHeader = EFI_TE_IMAGE_HEADER.from_buffer_copy(Data)
                 if TeHeader.Signature == EFI_TE_IMAGE_HEADER_SIGNATURE:
                     TeOffset = TeHeader.StrippedSize - sizeof(TeHeader)
 
             elif TempSectHeader.Type == EFI_SECTION_GUID_DEFINED:
                 if FileSize >= MAX_SECTION_SIZE:
-                    #GuidSectHeader2 = EFI_GUID_DEFINED_SECTION2.from_buffer_copy(Data[0:sizeof(EFI_GUID_DEFINED_SECTION2)])
                     GuidSectHeader2 = EFI_GUID_DEFINED_SECTION2.from_buffer_copy(Data)
                     if GuidSectHeader2.Attributes & EFI_GUIDED_SECTION_PROCESSING_REQUIRED == 0:
                         HeaderSize = GuidSectHeader2.DataOffset
                 else:
-                    #GuidSectHeader = EFI_GUID_DEFINED_SECTION.from_buffer_copy(Data[0:sizeof(EFI_GUID_DEFINED_SECTION)])
                     GuidSectHeader = EFI_GUID_DEFINED_SECTION.from_buffer_copy(Data)
                     if GuidSectHeader.Attributes & EFI_GUIDED_SECTION_PROCESSING_REQUIRED == 0:
                         HeaderSize = GuidSectHeader.DataOffset
@@ -725,9 +719,9 @@ def GenSectionCompressionSection(InputFileNum:int,SectCompSubType:int,InputFileN
     
     logger = logging.getLogger('GenSec')
     
-    CompressFunction = COMPRESS_FUNCTION()
-    
+    CompressFunction = None
     FileBuffer = b''
+    OutputBuffer = b''
     InputLength = 0
     CompressedLength = 0
     Status = GetSectionContents(InputFileNum,InputLength,InputFileName,InputFileAlign,FileBuffer)
@@ -746,20 +740,15 @@ def GenSectionCompressionSection(InputFileNum:int,SectCompSubType:int,InputFileN
     if SectCompSubType == EFI_NOT_COMPRESSED:
         CompressedLength = InputLength
         HeaderLength = sizeof(EFI_COMPRESSION_SECTION)
-        #Header = EFI_COMPRESSION_SECTION()
         if CompressedLength + HeaderLength >= MAX_SECTION_SIZE:
             HeaderLength = sizeof(EFI_COMPRESSION_SECTION2)
-            #Header = EFI_COMPRESSION_SECTION2()
         TotalLength = CompressedLength + HeaderLength
         
         #Copy file buffer to the none compressed data
-        OutputBuffer = b''
         OutputBuffer = FileBuffer
-        #OutputBuffer[HeaderLength:] = FileBuffer
-        #FileBuffer = OutputBuffer
         
     elif SectCompSubType == EFI_STANDARD_COMPRESSION:
-        CompressFunction = COMPRESS_FUNCTION(int(EfiCompress[0:sizeof(COMPRESS_FUNCTION)]))
+        CompressFunction = EfiCompress
         
     else:
         logger.error("Invalid parameter, unknown compression type")
@@ -767,7 +756,7 @@ def GenSectionCompressionSection(InputFileNum:int,SectCompSubType:int,InputFileN
     
     #Actual compressing 
     if CompressFunction != None:
-        Status = CompressFunction(FileBuffer,InputLength,OutputBuffer,CompressedLength)
+        Status = CompressFunction(InputLength,CompressedLength,FileBuffer,OutputBuffer)
         if Status == EFI_BUFFER_TOO_SMALL:
             HeaderLength = sizeof(EFI_COMPRESSION_SECTION)
             if CompressedLength + HeaderLength >= MAX_SECTION_SIZE:
@@ -781,7 +770,6 @@ def GenSectionCompressionSection(InputFileNum:int,SectCompSubType:int,InputFileN
             return Status
         if FileBuffer == None:
             return EFI_OUT_OF_RESOURCES
-    
     
     #Add the section header for the compressed data    
     if TotalLength >= MAX_SECTION_SIZE:
@@ -818,6 +806,7 @@ def GenSectionGuidDefinedSection(InputFileNum:int,VendorGuid:EFI_GUID,DataAttrib
     
     FileBuffer = b''
     InputLength = 0
+    Offset = 0
     #Read all input file contents into a buffer
     #first get the size of all file contents
     Status = GetSectionContents(InputFileNum,InputLength,InputFileName,InputFileAlign,FileBuffer)
@@ -919,9 +908,9 @@ def GenSectionSubtypeGuidSection(InputFileNum:int,SubTypeGuid:EFI_GUID,
     logger = logging.getLogger('GenSec')
     
     InputLength = 0
-    # Offset = 0
+    Offset = 0
     FileBuffer = b''
-    # TotalLength = 0
+
     
     if InputFileNum > 1:
         logger.error("Invalid parameter, more than one input file specified")
@@ -1009,8 +998,8 @@ def GetAlignmentFromFile(InFile:str,Alignment:int = 0) -> int:
     CommonHeader = EFI_COMMON_SECTION_HEADER.from_buffer_copy(PeFileBuffer)
     CurSecHdrSize = sizeof(CommonHeader)
     ImageContext = PE_COFF_LOADER_IMAGE_CONTEXT()
-    ImageContext.Handle =  PeFileBuffer[CurSecHdrSize:]
-    ImageContext.ImageRead = PE_COFF_LOADER_READ_FILE(FfsRebaseImageRead)
+    ImageContext.Handle =  PeFileBuffer[CurSecHdrSize:CurSecHdrSize + sizeof(c_uint64)]
+    ImageContext.ImageRead = FfsRebaseImageRead
     Status = PeCoffLoaderGetImageInfo(ImageContext)
     if EFI_ERROR(Status):
         logger.error("Invalid PeImage,he input file is %s and return status is %x",InFile,Status)
@@ -1027,10 +1016,11 @@ def main():
     InputFileAlignNum = 0
     MAXIMUM_INPUT_FILE_NUM = 10
     InputFileNum = 0
-    InputFileName = []
+    InputFileName = None
     InputFileAlign = []
     InputLength = 0
     OutFileBuffer = b''
+    StringBuffer = ''
     VendorGuid = mZeroGuid
     SectType = EFI_SECTION_ALL
     SectGuidAttribute = EFI_GUIDED_SECTION_NONE
@@ -1039,7 +1029,7 @@ def main():
     args = parser.parse_args()
     argc = len(sys.argv)
     
-    logger=logging.getLogger('GenCrc32')
+    logger=logging.getLogger('GenSec')
     if args.quiet:
         logger.setLevel(logging.CRITICAL)
     if args.verbose:
@@ -1054,6 +1044,7 @@ def main():
         logger.error("Missing options")
         return STATUS_ERROR
     
+    #Parse command line
     if args.SectionType:
         SectionName = args.SectionType
         if SectionName == None:
@@ -1066,7 +1057,7 @@ def main():
             logger.error("Invalid option value, Output file can't be NULL")
             #return STATUS_ERROR
             
-    if args.Type:
+    if args.Compress:
         CompressionName = args.Type
         if CompressionName == None:
             logger.error("Invalid option value, Compression Type can't be NULL")
@@ -1139,6 +1130,7 @@ def main():
         elif InputFileAlignNum % MAXIMUM_INPUT_FILE_NUM == 0:
             for i in range(MAXIMUM_INPUT_FILE_NUM):
                 InputFileAlign[InputFileNum + i] = 1
+
         if args.SectionAlign == "0":
             InputFileAlign[InputFileAlignNum] = 0
         else:
@@ -1152,11 +1144,13 @@ def main():
     if InputFileNum == 0 and InputFileName == None:
         for i in range(MAXIMUM_INPUT_FILE_NUM):
             InputFileName[i] = '0'
+
     elif InputFileNum % MAXIMUM_INPUT_FILE_NUM == 0:
         for i in range(MAXIMUM_INPUT_FILE_NUM):
-            InputFileName[InputFileNum + i] = 0
-    InputFileName[InputFileNum] = sys.argv[0]
-    InputFileNum += 1
+            InputFileName[InputFileNum + i] = '0'
+    for i in range(InputFileNum):
+        InputFileName[InputFileNum] = sys.argv[i]
+        InputFileNum += 1
     
     if InputFileAlignNum > 0 and InputFileAlignNum != InputFileNum:
         logger.error("Invalid option, section alignment must be set for each section")
