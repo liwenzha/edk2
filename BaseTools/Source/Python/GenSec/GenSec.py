@@ -151,16 +151,16 @@ def PeCoffLoaderGetPeHeader(ImageContext:PE_COFF_LOADER_IMAGE_CONTEXT,PeHdr:EFI_
         return Status
     
     ImageContext.PeCoffHeaderOffset = 0
-    if DosHdr.e_magic is EFI_IMAGE_DOS_SIGNATURE:
+    if DosHdr.e_magic == EFI_IMAGE_DOS_SIGNATURE:
         #DOS image header is present ,so read the PE header after the DOS image header
         ImageContext.PeCoffHeaderOffset = DosHdr.e_lfanew
         
     #Get the PE/COFF Header pointer
     PeHdr =  EFI_IMAGE_OPTIONAL_HEADER_UNION(ImageContext.Handle + ImageContext.PeCoffHeaderOffset)
-    if PeHdr.Pe32.Signature is not EFI_IMAGE_NT_SIGNATURE:
+    if PeHdr.Pe32.Signature != EFI_IMAGE_NT_SIGNATURE:
         #Check the PE/COFF Header Signature.If not,then try to get a TE header
         TeHdr = EFI_TE_IMAGE_HEADER(PeHdr)
-        if TeHdr.Signature is not EFI_TE_IMAGE_HEADER_SIGNATURE:
+        if TeHdr.Signature != EFI_TE_IMAGE_HEADER_SIGNATURE:
             return RETURN_UNSUPPORTED
         ImageContext.IsTeImage = True
     
@@ -171,7 +171,7 @@ def PeCoffLoaderGetPeHeader(ImageContext:PE_COFF_LOADER_IMAGE_CONTEXT,PeHdr:EFI_
 def PeCoffLoaderCheckImageType(ImageContext:PE_COFF_LOADER_IMAGE_CONTEXT,PeHdr:EFI_IMAGE_OPTIONAL_HEADER_UNION,TeHdr:EFI_TE_IMAGE_HEADER):
     #See if the machine type is supported
     #We supported a native machine type(IA-32/Itanium-based)
-    if ImageContext.IsTeImage is False:
+    if ImageContext.IsTeImage == False:
         ImageContext.Machine = PeHdr.Pe32.FileHeader.Machine
     else:
         ImageContext.Machine = TeHdr.Machine
@@ -180,21 +180,21 @@ def PeCoffLoaderCheckImageType(ImageContext:PE_COFF_LOADER_IMAGE_CONTEXT,PeHdr:E
         and ImageContext.Machine != EFI_IMAGE_MACHINE_ARMT and ImageContext.Machine != EFI_IMAGE_MACHINE_EBC\
             and ImageContext.Machine != EFI_IMAGE_MACHINE_AARCH64 and ImageContext.Machine != EFI_IMAGE_MACHINE_RISCV64\
                 and ImageContext.Machine != EFI_IMAGE_MACHINE_LOONGARCH64:
-                    if ImageContext.Machine == IMAGE_FILE_MACHINE_ARM:
-                        ImageContext.Machine = EFI_IMAGE_MACHINE_ARMT
-                        if ImageContext.IsTeImage == False:
-                            PeHdr.Pe32.FileHeader.Machine = ImageContext.Machine
-                        else:
-                            TeHdr.Machine = ImageContext.Machine
-                    else:
-                        return RETURN_UNSUPPORTED
+        if ImageContext.Machine == IMAGE_FILE_MACHINE_ARM:
+            ImageContext.Machine = EFI_IMAGE_MACHINE_ARMT
+            if ImageContext.IsTeImage == False:
+                PeHdr.Pe32.FileHeader.Machine = ImageContext.Machine
+            else:
+                TeHdr.Machine = ImageContext.Machine
+        else:
+            return RETURN_UNSUPPORTED
     if ImageContext.IsTeImage == False:
         ImageContext.ImageType = PeHdr.Pe32.OptionalHeader.Subsystem
     else:
         ImageContext.ImageType = TeHdr.Subsystem
     if ImageContext.ImageType != EFI_IMAGE_SUBSYSTEM_EFI_APPLICATION and ImageContext.ImageType != EFI_IMAGE_SUBSYSTEM_EFI_BOOT_SERVICE_DRIVER\
         and ImageContext.ImageType != EFI_IMAGE_SUBSYSTEM_EFI_RUNTIME_DRIVER and ImageContext.ImageType != EFI_IMAGE_SUBSYSTEM_SAL_RUNTIME_DRIVER:
-            return RETURN_UNSUPPORTED
+        return RETURN_UNSUPPORTED
     return RETURN_SUCCESS
 
 
@@ -348,7 +348,7 @@ def PeCoffLoaderGetImageInfo(ImageContext:PE_COFF_LOADER_IMAGE_CONTEXT) -> int:
                     if DebugEntry.Type is EFI_IMAGE_DEBUG_TYPE_CODEVIEW:
                         ImageContext.DebugDirectoryEntryRva = DebugDirectoryEntryRva + Index
                         return RETURN_SUCCESS
-        return RETURN_SUCCESS
+    return RETURN_SUCCESS
 
 
 #Compares to GUIDs
@@ -396,6 +396,8 @@ def AsciiStringToUint64(AsciiString:str,IsHex:bool,ReturnValue:int):
             CurrentChar = AsciiString[Index]
             if CurrentChar == ' ':
                 break
+            
+            #Verify Hex string
             if isxdigit(int(CurrentChar)) == 0:
                 return EFI_ABORTED
             
@@ -414,6 +416,8 @@ def AsciiStringToUint64(AsciiString:str,IsHex:bool,ReturnValue:int):
             CurrentChar = AsciiString[Index]
             if CurrentChar == ' ':
                 break
+            
+            #Verify Dec string
             if isdigit(int(CurrentChar)) == 0:
                 return EFI_ABORTED
             Value = Value * 10
@@ -524,7 +528,7 @@ parser.add_argument("-r","--attributes",dest="GuidAttr",help="GuidAttr is guid s
 parser.add_argument("-n","--name",dest="String",help="String is a NULL terminated string used in Ui section.")
 parser.add_argument("-j","--buildnumber",dest="Number",help=" Number is an integer value between 0 and 65535\
                     used in Ver section.")
-parser.add_argument("--sectionalign",dest="SectionAlign",nargs='+',help="SectionAlign points to section alignment, which support\
+parser.add_argument("--sectionalign",dest="SectionAlign",help="SectionAlign points to section alignment, which support\
                     the alignment scope 0~16M. If SectionAlign is specified\
                     as 0, tool get alignment value from SectionFile. It is\
                     specified in same order that the section file is input.")
@@ -1149,7 +1153,7 @@ def main():
         for i in range(MAXIMUM_INPUT_FILE_NUM):
             InputFileName[InputFileNum + i] = '0'
     for i in range(InputFileNum):
-        InputFileName[InputFileNum] = sys.argv[i]
+        InputFileName[InputFileNum] = sys.argv[0]
         InputFileNum += 1
     
     if InputFileAlignNum > 0 and InputFileAlignNum != InputFileNum:
