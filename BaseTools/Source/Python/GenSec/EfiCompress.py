@@ -24,10 +24,15 @@ PBIT = 4
 UINT8_BIT = 8
 mSubBitBuf = None
 
-mSrc = None
-mDst = None
-mSrcUpperLimit = None
-mDstUpperLimit = None
+
+mSrc = b''
+mSrcAdd = 0
+mDst = b''
+mDstAdd = 0
+mSrcUpperLimit = 0
+mDstUpperLimit = 0
+mCrc = 0
+
 mLevel = []
 mCLen = []*NC
 mCCode = []*NC
@@ -39,7 +44,7 @@ mHeap = []*(NC + 1)
 mLeft = []*(2 * NC - 1)
 mRight = []*(2 * NC - 1)
 mLenCnt = [] * 17
-mText = []
+mText = b''
 mChildCount = []
 mBuf = []
 mMatchLen = None
@@ -77,21 +82,22 @@ def EFI_ERROR(A):
 
 #Put a dword to output stream
 def PutDword(Data:int):
-    if mDst < mDstUpperLimit:
-        mDst = Data & 0xff
-        mDst = mDst + 1
+
+    if mDstAdd < mDstUpperLimit:
+        mDst = mDst + bytes(Data & 0xff)
+        mDstAdd += 1
         
-    if mDst < mDstUpperLimit:
-        mDst = Data >> 0x08 & 0xff
-        mDst = mDst + 1
+    if mDstAdd < mDstUpperLimit:
+        mDst = mDst + bytes(Data >> 0x08 & 0xff)
+        mDstAdd += 1
         
-    if mDst < mDstUpperLimit:
-        mDst = Data >> 0x10 & 0xff
-        mDst = mDst + 1
+    if mDstAdd < mDstUpperLimit:
+        mDst = mDst + bytes(Data >> 0x10 & 0xff)
+        mDstAdd += 1
         
-    if mDst < mDstUpperLimit:
-        mDst = Data >> 0x18 & 0xff
-        mDst = mDst + 1
+    if mDstAdd < mDstUpperLimit:
+        mDst = mDst + bytes(Data >> 0x18 & 0xff)
+        mDstAdd += 1
 
 
 def MakeCrcTable():
@@ -149,18 +155,18 @@ def UPDATE_CRC(a):
 #Read in source data
 def FreadCrc(p:int,n:int) -> int:
     i = 0
-    while mSrc < mSrcUpperLimit and i < n:
-        p = mSrc
-        p += 1
-        mSrc += 1
+    mSrcAdd = 0
+    while mSrcAdd < mSrcUpperLimit and i < n:
+        p = p + mSrc[i:i+1]
+        mSrcAdd += 1
         i += 1
     n = i
     
-    p -= n
     mOrigSize += n
+    j = 0
     while i - 1 >= 0:
-        UPDATE_CRC(p)
-        p += 1
+        UPDATE_CRC(p[j])
+        j += 1
     return n
 
 
@@ -211,18 +217,22 @@ def PutBits(n:c_uint32,x:c_uint32):
     else:
         n -= mBitCount
         Temp = mSubBitBuf | x >> n
-        if mDst < mDstUpperLimit:
-            mDst = Temp
-            mDst += 1
+
+        if mDstAdd < mDstUpperLimit:
+            mDst = mDst + bytes(Temp)
+            mDstAdd += 1
+        
         mCompSize += 1
         if n < UINT8_BIT:
             mBitCount = UINT8_BIT - n
             mSubBitBuf = x << mBitCount
         else:
             Temp = (x >> (n - UINT8_BIT))
-            if mDst < mDstUpperLimit:
-                mDst = Temp
-                mDst += 1
+
+            if mDstAdd < mDstUpperLimit:
+                mDst = mDst + bytes(Temp)
+                mDstAdd += 1
+
             mCompSize += 1
             mBitCount = 2 * UINT8_BIT - n
             mSubBitBuf = x << mBitCount
@@ -530,7 +540,9 @@ def InsertNode():
             mMatchLen = 1
             return
         mMatchLen = 2
-        
+    #Traverse down the tree to find a match.
+    #Update Position value along the route.
+    #Node split or creation is involved.
     while True:
         if r >= WNDSIZ:
             j = MAXMATCH
@@ -541,11 +553,14 @@ def InsertNode():
         if mMatchPos >= mPos:
             mMatchPos -= WNDSIZ
         index1= mPos + mMatchLen
-        t1 = mText[index1]
+        #t1 = mText[index1]
+        
         index2 = mMatchPos + mMatchLen
-        t2 = mText[index2]
+        #t2 = mText[index2]
+        
+
         while mMatchLen < j:
-            if t1 != t2:
+            if mText[index1] != mText[index2]:
                 Split(r)
                 return
             mMatchLen += 1
@@ -555,9 +570,10 @@ def InsertNode():
             break
         mPosition[r] = mPos
         q = r
-        r = Child(q, t1)
+        r = Child(q, mText[index1])
         if r == 0:
-            MakeChild(q, *t1, mPos)
+
+            MakeChild(q, mText[index1], mPos)
             return
         mMatchLen +=1
         t = mPrev[r]
@@ -605,10 +621,14 @@ def HufEncodeEnd():
 
 #The main controlling routine for compression process.
 def Encode() -> int:
+    for i in range(WNDSIZ):
+        mText = mText +b'0'
+        
     InitSlide()
     HufEncodeStart()
 
-    mRemainder = FreadCrc(mText[WNDSIZ], WNDSIZ + 256)
+
+    mRemainder = FreadCrc(mText[WNDSIZ],WNDSIZ + MAXMATCH)
     mMatchLen = 0
     mPos = WNDSIZ
     InsertNode()
@@ -640,9 +660,14 @@ def EfiCompress(SrcSize:int,DstSize:int,SrcBuffer = b'',DstBuffer = b'') -> c_ui
     Status = EFI_SUCCESS
     
     mSrc = SrcBuffer
-    mSrcUpperLimit = mSrc[SrcSize:]
+    
+    mSrcAdd = 0
+    # mSrc = mSrc.decode()
+    mSrcUpperLimit = mSrcAdd + SrcSize
     mDst = DstBuffer
-    mDstUpperLimit = mDst + DstSize
+    #mDstAdd = 0
+    # mDst = mDst.decode()
+    mDstUpperLimit = mDstAdd + DstSize
     
     PutDword(0)
     PutDword(0)
@@ -656,6 +681,13 @@ def EfiCompress(SrcSize:int,DstSize:int,SrcBuffer = b'',DstBuffer = b'') -> c_ui
     Status = Encode()
     if EFI_ERROR (Status):
         return EFI_OUT_OF_RESOURCES
+    
+
+    
+    #Null terminate the compressed data
+    if mDstAdd < mDstUpperLimit:
+        mDst = mDst + b'0'
+        mDstAdd += 1
     
     #Fill in compressed size and original size
     mDst = DstBuffer
