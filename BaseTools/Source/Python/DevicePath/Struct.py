@@ -50,6 +50,7 @@ def SplitStr(List:str,Separator:str):
     if IS_NULL(Str) == 0:
         return ReturnStr
     
+    #Find first occurrence of the separator
     for ch in Str:
         if IS_NULL(ch) == 0:
             if ch == Separator:
@@ -64,13 +65,25 @@ def SplitStr(List:str,Separator:str):
         
 
 def GetNextParamStr(List:str) ->str:
+    #The separator is comma
     return SplitStr(List,',')
 
 
-def DevPathFromTextGenericPath(Type:int,TextDeviceNode:str):
+def StrHexToBytes(String:c_char_p,Length:c_uint64,Buffer) -> int:
+    pass
+
+def DevPathFromTextGenericPath(Type:int,TextDeviceNode:str) -> EFI_DEVICE_PATH_PROTOCOL:
     SubtypeStr = GetNextParamStr(TextDeviceNode)
     DataStr = GetNextParamStr (TextDeviceNode)
-
+    
+    if DataStr == None:
+        DataLength = 0
+    else:
+        DataLength =  len(DataStr) / 2
+    
+    Node = CreateDeviceNode(Type,c_uint8(SubtypeStr),sizeof (EFI_DEVICE_PATH_PROTOCOL) + DataLength)
+    StrHexToBytes(DataStr, DataLength * 2, Node + 1, DataLength)
+    return Node
 
 #Converts a generic text device path node to device path structure.
 def DevPathFromTextPath(TextDeviceNode:str) -> EFI_DEVICE_PATH_PROTOCOL:
@@ -89,7 +102,7 @@ def SetDevicePathNodeLength(Node,Length:int) -> c_uint16:
  
 def UefiDevicePathLibCreateDeviceNode(NodeType:c_uint8,NodeSubType:c_int8,NodeLength:c_uint16) -> EFI_DEVICE_PATH_PROTOCOL:
     DevicePath = EFI_DEVICE_PATH_PROTOCOL()
-    if NodeLength < sizeof(EFI_DEVICE_PATH_PROTOCOL)
+    if NodeLength < sizeof(EFI_DEVICE_PATH_PROTOCOL):
         return None
 
     DevicePath.Type = NodeType
@@ -406,19 +419,21 @@ def AppendDevicePathNode(DevicePath:EFI_DEVICE_PATH_PROTOCOL,DevicePathNode:EFI_
 
 
 #Fills in all the fields of a device path node that is the end of an entire device path 
-def SetDevicePathEndNode(Node:None):
+def SetDevicePathEndNode(Node):
     assert(Node != None)
     Node = mUefiDevicePathLibEndDevicePath
 
 
 #Duplicates a string
 def UefiDevicePathLibStrDuplicate(Src:str) -> str:
-    String = str
+    String = ''
+    String =Src
     return String
 
 
 #Get one device node from entire device path text
 def GetNextDeviceNodeStr(DevicePath:str,IsInstanceEnd:bool) -> str:
+    
     Str = DevicePath
 
     if IS_NULL(Str):
@@ -426,8 +441,8 @@ def GetNextDeviceNodeStr(DevicePath:str,IsInstanceEnd:bool) -> str:
     
     #Skip the leading '/','(',')' and ','
     for ch in Str:
-        if IS_NULL(ch) == False:
-            if IS_SLASH(Str == False) and IS_SLASH(Str == False) and IS_LEFT_PARENTH (Str) == False and IS_RIGHT_PARENTH (Str) == False:
+        if IS_NULL(ch) == 0:
+            if IS_SLASH(ch)== False and IS_SLASH(ch) == False and IS_LEFT_PARENTH (ch) == False and IS_RIGHT_PARENTH (ch) == False:
                 break
             
     ReturnStr = Str
@@ -453,7 +468,8 @@ def GetNextDeviceNodeStr(DevicePath:str,IsInstanceEnd:bool) -> str:
             ch = '\0'
         else:
             IsInstanceEnd = False
-            ch = '\0'
+            if IS_NULL(ch) == 0:
+                ch = '\0'
             
     DevicePath = Str
     

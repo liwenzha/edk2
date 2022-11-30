@@ -21,22 +21,22 @@ END_INSTANCE_DEVICE_PATH_SUBTYPE = 0x01
 parser = argparse.ArgumentParser(description="A Device Path Tool")
 parser.add_argument("--version",dest="version",help="Show program's version number and exit.")
 parser.add_argument("-h","--help",dest="help",help="Show this help message and exit.")
+parser.add_argument("--version", action="version", version='%(prog)s Version 2.0',
+                    help="Show program's version number and exit.")
 
 
-def PrintMem(Buffer:None,Count:int) -> None:
+def PrintMem(Buffer:EFI_DEVICE_PATH_PROTOCOL,Count:int):
     Bytes = Buffer
     for Idx in range(Count):
         print("0x" + Bytes[Idx])
         
 
 #Write ascii string as unicode string format to FILE
-def Ascii2UnicodeString(String:str,UniString:str):
-    for ch in String:
-        if ch != '\0':
-            UniString = String & 0xffff
-            UniString = UniString + 1
-            String = String + 1
-    Unistring ='\0'
+def Ascii2UnicodeString(String:str,UniString:c_uint16) -> EFI_DEVICE_PATH_PROTOCOL:
+    for i in range(len(String)):
+        if String[i] != '\0':
+            UniString[i] = c_uint16(String[i])
+    Unistring +='\0'
 
 
 #Convert text to the binary representation of a device path
@@ -74,16 +74,17 @@ def main():
     logger = logging.getLogger('DevicePath')
     
     args = parser.parse_args()
+    
     if len(sys.argv) == 1:
         logger.error("Missing options", "No input options specified.")
         parser.print_help()
         return STATUS_ERROR
     
-    if args.help:
-        pass
+    # if args.help:
+    #     pass
     
-    if args.version:
-        pass
+    # if args.version:
+    #     pass
     
     Str = sys.argv[1]
     if Str == None:
