@@ -168,7 +168,7 @@ class EFI_TE_IMAGE_HEADER(Structure):
         ('AddressOfEntryPoint',c_uint32),
         ('BaseOfCode',c_uint32),
         ('ImageBase',c_uint64),
-        ('DataDirectory[2]',EFI_IMAGE_DATA_DIRECTORY),
+        ('DataDirectory',ARRAY(EFI_IMAGE_DATA_DIRECTORY,2)),
     ]
     
     def ExtHeaderSize(self) -> int:
@@ -195,7 +195,7 @@ class PE_COFF_LOADER_IMAGE_CONTEXT(Structure):
                ('SectionAlignment',c_uint32),
                ('PeCoffHeaderOffset',c_uint32),
                ('DebugDirectoryEntryRva',c_uint32),
-               ('CodeView',c_int),
+               ('CodeView',c_void_p),
                ('PdbPointer',c_char),
                ('SizeOfHeaders',c_uint64),
                ('ImageCodeMemoryType',c_uint32),
@@ -407,7 +407,7 @@ class EFI_VERSION_SECTION(Structure):
     _fields_ = [
         ('CommonHeader',EFI_COMMON_SECTION_HEADER),
         ('BuildNumber',c_uint16),
-        ('VersionString',c_char)
+        ('VersionString',ARRAY(c_char_p,1))
     ]
     
 
@@ -415,7 +415,7 @@ class EFI_USER_INTERFACE_SECTION(Structure):
     _pack_ = 1
     _fields_ = [
         ('CommonHeader',EFI_COMMON_SECTION_HEADER),
-        ('FileNameString',c_char)
+        ('FileNameString',ARRAY(c_char_p,1))
     ]
 
 

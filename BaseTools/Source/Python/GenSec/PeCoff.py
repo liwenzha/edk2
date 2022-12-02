@@ -77,12 +77,14 @@ EFI_IMAGE_DEBUG_TYPE_CODEVIEW = 2
 
 #Retrieves the PE or TE Header from a PE/COFF or te image
 def PeCoffLoaderGetPeHeader(ImageContext:PE_COFF_LOADER_IMAGE_CONTEXT,PeHdr:EFI_IMAGE_OPTIONAL_HEADER_UNION,TeHdr:EFI_TE_IMAGE_HEADER):
-    DosHdr = EFI_IMAGE_DOS_HEADER()
+    #DosHdr = EFI_IMAGE_DOS_HEADER()
+    DosHdrBuffer = b''
     ImageContext.IsTeImage = False
     
     #Read the DOS image header
     Size = sizeof(EFI_IMAGE_DOS_HEADER)
-    Status = ImageContext.ImageRead(ImageContext.Handle,0,Size,DosHdr)
+    Status = ImageContext.ImageRead(0,Size,ImageContext.Handle,DosHdrBuffer)
+    DosHdr = EFI_IMAGE_DOS_HEADER.from_buffer_copy(DosHdrBuffer)
     if RETURN_ERROR (Status):
         ImageContext.ImageError = IMAGE_ERROR_IMAGE_READ
         return Status
@@ -93,10 +95,12 @@ def PeCoffLoaderGetPeHeader(ImageContext:PE_COFF_LOADER_IMAGE_CONTEXT,PeHdr:EFI_
         ImageContext.PeCoffHeaderOffset = DosHdr.e_lfanew
         
     #Get the PE/COFF Header pointer
-    PeHdr =  EFI_IMAGE_OPTIONAL_HEADER_UNION(ImageContext.Handle + ImageContext.PeCoffHeaderOffset)
+    PeHdrBuffer = ImageContext.Handle[ImageContext.PeCoffHeaderOffset : ImageContext.PeCoffHeaderOffset + sizeof(EFI_IMAGE_OPTIONAL_HEADER_UNION)]
+    PeHdr =  EFI_IMAGE_OPTIONAL_HEADER_UNION.from_buffer_copy(PeHdrBuffer)
     if PeHdr.Pe32.Signature != EFI_IMAGE_NT_SIGNATURE:
         #Check the PE/COFF Header Signature.If not,then try to get a TE header
-        TeHdr = EFI_TE_IMAGE_HEADER(PeHdr)
+        
+        TeHdr = EFI_TE_IMAGE_HEADER.from_buffer_copy(PeHdrBuffer)
         if TeHdr.Signature != EFI_TE_IMAGE_HEADER_SIGNATURE:
             return RETURN_UNSUPPORTED
         ImageContext.IsTeImage = True
@@ -106,6 +110,7 @@ def PeCoffLoaderGetPeHeader(ImageContext:PE_COFF_LOADER_IMAGE_CONTEXT,PeHdr:EFI_
 
 #Checks the PE or TE header of a PE/COFF or TE image to determine if it supported
 def PeCoffLoaderCheckImageType(ImageContext:PE_COFF_LOADER_IMAGE_CONTEXT,PeHdr:EFI_IMAGE_OPTIONAL_HEADER_UNION,TeHdr:EFI_TE_IMAGE_HEADER):
+    
     #See if the machine type is supported
     #We supported a native machine type(IA-32/Itanium-based)
     if ImageContext.IsTeImage == False:
@@ -124,13 +129,18 @@ def PeCoffLoaderCheckImageType(ImageContext:PE_COFF_LOADER_IMAGE_CONTEXT,PeHdr:E
             else:
                 TeHdr.Machine = ImageContext.Machine
         else:
+            #Unsupported PeImage machine type
             return RETURN_UNSUPPORTED
+    
+    #See if the image type is supported.  We support EFI Applications,
+    #EFI Boot Service Drivers, EFI Runtime Drivers and EFI SAL Drivers.
     if ImageContext.IsTeImage == False:
         ImageContext.ImageType = PeHdr.Pe32.OptionalHeader.Subsystem
     else:
         ImageContext.ImageType = TeHdr.Subsystem
     if ImageContext.ImageType != EFI_IMAGE_SUBSYSTEM_EFI_APPLICATION and ImageContext.ImageType != EFI_IMAGE_SUBSYSTEM_EFI_BOOT_SERVICE_DRIVER\
         and ImageContext.ImageType != EFI_IMAGE_SUBSYSTEM_EFI_RUNTIME_DRIVER and ImageContext.ImageType != EFI_IMAGE_SUBSYSTEM_SAL_RUNTIME_DRIVER:
+        #Unsupported PeImage subsystem type
         return RETURN_UNSUPPORTED
     return RETURN_SUCCESS
 
@@ -175,8 +185,8 @@ def PeCoffLoaderGetImageInfo(ImageContext:PE_COFF_LOADER_IMAGE_CONTEXT) -> int:
     ImageContext.DestinationAddress = 0
     
     #Initialize the codeview pointer.
-    ImageContext.CodeView = None
-    ImageContext.PdbPointer = None
+    ImageContext.CodeView = 0
+    ImageContext.PdbPointer = 0
     
     if (ImageContext.IsTeImage == 0) and (PeHdr.Pe32.FileHeader.Characteristics & EFI_IMAGE_FILE_RELOCS_STRIPPED) != 0:
         ImageContext.RelocationsStripped = True
@@ -191,8 +201,10 @@ def PeCoffLoaderGetImageInfo(ImageContext:PE_COFF_LOADER_IMAGE_CONTEXT) -> int:
             ImageContext.SectionAlignment = OptionHeader.Optional32.SectionAlignment
             ImageContext.SizeOfHeaders = OptionHeader.Optional32.SizeOfHeaders
             
+            #Modify ImageSize to contain .PDB file name if required and initialize
+            #PdbRVA field...
             if OptionHeader.Optional32.NumberOfRvaAndSizes > EFI_IMAGE_DIRECTORY_ENTRY_DEBUG:
-                DebugDirectoryEntry = EFI_IMAGE_DATA_DIRECTORY(OptionHeader.Optional32.DataDirectory[EFI_IMAGE_DIRECTORY_ENTRY_DEBUG])
+                DebugDirectoryEntry = OptionHeader.Optional32.DataDirectory[EFI_IMAGE_DIRECTORY_ENTRY_DEBUG]
                 DebugDirectoryEntryRva = DebugDirectoryEntry.VirtualAddress
         else:
             ImageContext.ImageSize = OptionHeader.Optional64.SizeOfImage
@@ -200,10 +212,13 @@ def PeCoffLoaderGetImageInfo(ImageContext:PE_COFF_LOADER_IMAGE_CONTEXT) -> int:
             ImageContext.SizeOfHeaders = OptionHeader.Optional64.SizeOfHeaders
             
             if OptionHeader.Optional64.NumberOfRvaAndSizes > EFI_IMAGE_DIRECTORY_ENTRY_DEBUG:
-                DebugDirectoryEntry = EFI_IMAGE_DATA_DIRECTORY(OptionHeader.Optional64.DataDirectory[EFI_IMAGE_DIRECTORY_ENTRY_DEBUG])
+                DebugDirectoryEntry = OptionHeader.Optional64.DataDirectory[EFI_IMAGE_DIRECTORY_ENTRY_DEBUG]
                 DebugDirectoryEntryRva = DebugDirectoryEntry.VirtualAddress
                 
         if DebugDirectoryEntryRva != 0:
+            #Determine the file offset of the debug directory...  This means we walk
+            #the sections to find which section contains the RVA of the debug directory
+
             DebugDirectoryEntryFileOffset = 0
             SectionHeaderOffset = ImageContext.PeCoffHeaderOffset +\
                                     sizeof(c_uint32) +\
@@ -213,8 +228,10 @@ def PeCoffLoaderGetImageInfo(ImageContext:PE_COFF_LOADER_IMAGE_CONTEXT) -> int:
             for Index in range(PeHdr.Pe32.FileHeader.NumberOfSections):
                 #Read section header from file
                 Size = sizeof(EFI_IMAGE_SECTION_HEADER)
-                Status = ImageContext.ImageRead(ImageContext.Handle,SectionHeaderOffset,
-                                                Size,SectionHeader)
+                SectionHeaderBuffer = b''
+                Status = ImageContext.ImageRead(SectionHeaderOffset,
+                                                Size,ImageContext.Handle,SectionHeaderBuffer)
+                SectionHeader = EFI_IMAGE_SECTION_HEADER.from_buffer_copy(SectionHeaderBuffer)
                 if RETURN_ERROR(Status):
                     ImageContext.ImageError = IMAGE_ERROR_IMAGE_READ
                     return Status
@@ -224,20 +241,23 @@ def PeCoffLoaderGetImageInfo(ImageContext:PE_COFF_LOADER_IMAGE_CONTEXT) -> int:
                     break
                 SectionHeaderOffset += sizeof (EFI_IMAGE_SECTION_HEADER)
                 
-                if DebugDirectoryEntryFileOffset != 0:
-                    for Index in range(0,DebugDirectoryEntry.Size,sizeof (EFI_IMAGE_DEBUG_DIRECTORY_ENTRY)):
-                        Size = sizeof (EFI_IMAGE_DEBUG_DIRECTORY_ENTRY)
-                        Status = ImageContext.ImageRead(ImageContext.Handle,DebugDirectoryEntryFileOffset + Index,
-                                                        Size,DebugEntry)
-                        if RETURN_ERROR(Status):
-                            ImageContext.ImageError = IMAGE_ERROR_IMAGE_READ
-                            return Status
-    
-                        if DebugEntry.Type == EFI_IMAGE_DEBUG_TYPE_CODEVIEW:
-                            ImageContext.DebugDirectoryEntryRva = DebugDirectoryEntryRva + Index
-                            if DebugEntry.RVA == 0 and DebugEntry.FileOffset != 0:
-                                ImageContext.ImageSize += DebugEntry.SizeOfData
-                            return RETURN_SUCCESS
+            if DebugDirectoryEntryFileOffset != 0:
+                for Index in range(0,DebugDirectoryEntry.Size,sizeof (EFI_IMAGE_DEBUG_DIRECTORY_ENTRY)):
+                    #Read next debug directory entry
+                    Size = sizeof (EFI_IMAGE_DEBUG_DIRECTORY_ENTRY)
+                    DebugEntryBuffer = b''
+                    Status = ImageContext.ImageRead(DebugDirectoryEntryFileOffset + Index,
+                                                    Size,ImageContext.Handle,DebugEntryBuffer)
+                    DebugEntry = EFI_IMAGE_DEBUG_DIRECTORY_ENTRY.from_buffer_copy(DebugEntryBuffer)
+                    if RETURN_ERROR(Status):
+                        ImageContext.ImageError = IMAGE_ERROR_IMAGE_READ
+                        return Status
+
+                    if DebugEntry.Type == EFI_IMAGE_DEBUG_TYPE_CODEVIEW:
+                        ImageContext.DebugDirectoryEntryRva = DebugDirectoryEntryRva + Index
+                        if DebugEntry.RVA == 0 and DebugEntry.FileOffset != 0:
+                            ImageContext.ImageSize += DebugEntry.SizeOfData
+                        return RETURN_SUCCESS
         else:
             ImageContext.ImageSize = 0
             ImageContext.SectionAlignment = 4096
@@ -252,7 +272,9 @@ def PeCoffLoaderGetImageInfo(ImageContext:PE_COFF_LOADER_IMAGE_CONTEXT) -> int:
             for Index in range(TeHdr.NumberOfSections):
                 #Read section header from file
                 Size = sizeof (EFI_IMAGE_SECTION_HEADER)
-                Status = ImageContext.ImageRead(ImageContext.Handle,SectionHeaderOffset,Size,SectionHeader)
+                SectionHeaderBuffer = b''
+                Status = ImageContext.ImageRead(SectionHeaderOffset,Size,ImageContext.Handle,SectionHeaderBuffer)
+                SectionHeader = SectionHeader = EFI_IMAGE_SECTION_HEADER.from_buffer_copy(SectionHeaderBuffer)
                 if RETURN_ERROR (Status):
                     ImageContext.ImageError = IMAGE_ERROR_IMAGE_READ
                     return Status
@@ -276,8 +298,10 @@ def PeCoffLoaderGetImageInfo(ImageContext:PE_COFF_LOADER_IMAGE_CONTEXT) -> int:
             if DebugDirectoryEntryFileOffset != 0:
                 for Index in range(0,DebugDirectoryEntry.Size,sizeof (EFI_IMAGE_DEBUG_DIRECTORY_ENTRY)):
                     Size = sizeof (EFI_IMAGE_DEBUG_DIRECTORY_ENTRY)
-                    Status = ImageContext.ImageRead(ImageContext.Handle,DebugDirectoryEntryFileOffset,
-                                                    Size,DebugEntry)
+                    DebugEntryBuffer = b''
+                    Status = ImageContext.ImageRead(DebugDirectoryEntryFileOffset,
+                                                    Size,ImageContext.Handle,DebugEntryBuffer)
+                    DebugEntry = EFI_IMAGE_DEBUG_DIRECTORY_ENTRY.from_buffer_copy(DebugEntryBuffer)
                     if RETURN_ERROR (Status):
                         ImageContext.ImageError = IMAGE_ERROR_IMAGE_READ
                         return Status
