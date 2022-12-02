@@ -193,10 +193,14 @@ def main():
     elif InputFileNum % MAXIMUM_INPUT_FILE_NUM == 0:
         for i in range(InputFileNum,InputFileNum + MAXIMUM_INPUT_FILE_NUM,1):
             InputFileName[i] = '0'
-    for i in range(InputFileNum):
-        InputFileName[InputFileNum] = sys.argv[0]
-        InputFileNum += 1
+            
+    # for i in range(InputFileNum):
+    InputFileName[InputFileNum] = sys.argv[0]
+    InputFileNum += 1
+    #到此为止，命令行的读取结束
     
+    
+    #这里开始对于读取到的参数进行分析处理
     if InputFileAlignNum > 0 and InputFileAlignNum != InputFileNum:
         logger.error("Invalid option, section alignment must be set for each section")
         #return STATUS_ERROR
@@ -206,7 +210,7 @@ def main():
             if EFI_ERROR(Status):
                 logger.error("Fail to get Alignment from %s",InputFileName[InputFileNum])
     
-    if DummyFileName != None:
+    if DummyFileName:
         #Open file and read contents
         with open(DummyFileName,'rb') as DummyFile:
             if DummyFile == None:

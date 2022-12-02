@@ -509,17 +509,18 @@ def FfsRebaseImageRead(FileOffset:int,ReadSize:int,FileHandle = b'',Buffer = b''
     Destination8 = Buffer
     Source8 = FileHandle[FileOffset:]
     Length = ReadSize
-    while Length - 1:
-        Destination8 = Source8 
-        Destination8 += 1
-        Source8 += 1
-        #Length -= 1
+    # while Length - 1:
+    #     Destination8 = Source8 
+    #     Destination8 += 1
+    #     Source8 += 1
+    #     #Length -= 1
+    Destination8 += Source8[0:Length]
     return EFI_SUCCESS
 
 
 #InFile is input file for getting alignment
 #return the alignment
-def GetAlignmentFromFile(InFile:str,Alignment:int = 0) -> int:
+def GetAlignmentFromFile(InFile:str,Alignment:int) -> int:
     
     logger = logging.getLogger('GenSec')
 
@@ -535,6 +536,7 @@ def GetAlignmentFromFile(InFile:str,Alignment:int = 0) -> int:
     
     CommonHeader = EFI_COMMON_SECTION_HEADER.from_buffer_copy(PeFileBuffer)
     CurSecHdrSize = sizeof(CommonHeader)
+    
     ImageContext = PE_COFF_LOADER_IMAGE_CONTEXT()
     ImageContext.Handle =  PeFileBuffer[CurSecHdrSize:CurSecHdrSize + sizeof(c_uint64)]
     ImageContext.ImageRead = FfsRebaseImageRead
