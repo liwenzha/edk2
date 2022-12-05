@@ -94,36 +94,36 @@ def main():
         SectionName = args.SectionType
         if SectionName == None:
             logger.error("Invalid option value, Section Type can't be NULL")
-            #return STATUS_ERROR
+            return STATUS_ERROR
             
     if args.output:
         OutputFileName = args.output
         if OutputFileName == None:
             logger.error("Invalid option value, Output file can't be NULL")
-            #return STATUS_ERROR
+            return STATUS_ERROR
             
     if args.Compress:
         CompressionName = args.Type
         if CompressionName == None:
             logger.error("Invalid option value, Compression Type can't be NULL")
-            #return STATUS_ERROR 
+            return STATUS_ERROR 
             
     if args.GuidValue:
         Status = StringToGuid(args.GuidValue,VendorGuid)
         if EFI_ERROR (Status):
             logger.error("Invalid option value")
-            #return STATUS_ERROR
+            return STATUS_ERROR
         
     if args.dummyfile:
         DummyFileName = args.dummyfile
         if DummyFileName == None:
             logger.error("Invalid option value, Dummy file can't be NULL")
-            #return STATUS_ERROR
+            return STATUS_ERROR
             
     if args.GuidAttr:
         if args.GuidAttr == None:
             logger.error("Invalid option value, Guid section attributes can't be NULL")
-            #return STATUS_ERROR
+            return STATUS_ERROR
         if args.GuidAttr == mGUIDedSectionAttribue[EFI_GUIDED_SECTION_PROCESSING_REQUIRED]:
             SectGuidAttribute |= EFI_GUIDED_SECTION_PROCESSING_REQUIRED
         elif args.GuidAttr == mGUIDedSectionAttribue[EFI_GUIDED_SECTION_AUTH_STATUS_VALID]:
@@ -133,30 +133,30 @@ def main():
             SectGuidAttribute |= EFI_GUIDED_SECTION_NONE
         else:
             logger.error("Invalid option value")
-            #return STATUS_ERROR
+            return STATUS_ERROR
     
     if args.GuidHeaderLength:
         Status = AsciiStringToUint64(args.GuidHeaderLength,False,SectGuidHeaderLength)
         if EFI_ERROR (Status):
             logger.error("Invalid option value for GuidHeaderLength")
-            #return STATUS_ERROR
+            return STATUS_ERROR
     
     if args.String:
         StringBuffer = args.String
         if args.String == None:
             logger.error("Invalid option value, Name can't be NULL")
-            #return STATUS_ERROR
+            return STATUS_ERROR
         
     if args.Number:
         if args.Number == None:
             logger.error("Invalid option value, build number can't be NULL")
-            #return STATUS_ERROR
+            return STATUS_ERROR
         
         #Verify string is a integrator number
         for ch in args.Number:
             if ch != '-' and isdigit(int(ch)) == 0:
                 logger.error("Invalid option value")
-                #return STATUS_ERROR
+                return STATUS_ERROR
         VersionNumber = int(args.Number)
         
     # if args.debug_level:
@@ -169,12 +169,12 @@ def main():
         
     #Section File alignment requirement
     if args.SectionAlign:
-        if InputFileAlignNum == 0:
-            for i in range(MAXIMUM_INPUT_FILE_NUM):
-                InputFileAlign.append(1)
-        elif InputFileAlignNum % MAXIMUM_INPUT_FILE_NUM == 0:
-            for i in range(InputFileNum,InputFileNum + MAXIMUM_INPUT_FILE_NUM,1):
-                InputFileAlign[i] = 0
+        # if InputFileAlignNum == 0:
+        #     for i in range(MAXIMUM_INPUT_FILE_NUM):
+        #         InputFileAlign.append(1)
+        # elif InputFileAlignNum % MAXIMUM_INPUT_FILE_NUM == 0:
+        #     for i in range(InputFileNum,InputFileNum + MAXIMUM_INPUT_FILE_NUM,1):
+        #         InputFileAlign[i] = 0
 
         if args.SectionAlign == "0":
             InputFileAlign[InputFileAlignNum] = 0
@@ -182,28 +182,28 @@ def main():
             Status = StringtoAlignment(args.SectionAlign,InputFileAlign[InputFileAlignNum])
             if EFI_ERROR (Status):
                 logger.error("Invalid option value")
-                #return STATUS_ERROR
+                return STATUS_ERROR
         InputFileAlignNum += 1
 
     #Get input file name
-    if InputFileNum == 0 and len(InputFileName) == 0:
-        for i in range(MAXIMUM_INPUT_FILE_NUM):
-            InputFileName.append('0') 
+    # if InputFileNum == 0 and len(InputFileName) == 0:
+    #     for i in range(MAXIMUM_INPUT_FILE_NUM):
+    #         InputFileName.append('0') 
 
-    elif InputFileNum % MAXIMUM_INPUT_FILE_NUM == 0:
-        for i in range(InputFileNum,InputFileNum + MAXIMUM_INPUT_FILE_NUM,1):
-            InputFileName[i] = '0'
+    # elif InputFileNum % MAXIMUM_INPUT_FILE_NUM == 0:
+    #     for i in range(InputFileNum,InputFileNum + MAXIMUM_INPUT_FILE_NUM,1):
+    #         InputFileName[i] = '0'
             
     # for i in range(InputFileNum):
-    InputFileName[InputFileNum] = sys.argv[0]
+    InputFileName[InputFileNum] = sys.argv[1]
     InputFileNum += 1
-    #到此为止，命令行的读取结束
+    #到此为止，命令行的读取结束，且已经得到了文件名称
     
     
     #这里开始对于读取到的参数进行分析处理
     if InputFileAlignNum > 0 and InputFileAlignNum != InputFileNum:
         logger.error("Invalid option, section alignment must be set for each section")
-        #return STATUS_ERROR
+        return STATUS_ERROR
     for Index in range(InputFileAlignNum):
         if InputFileAlign[Index] == 0:
             Status = GetAlignmentFromFile(InputFileName[Index], InputFileAlign[Index])
