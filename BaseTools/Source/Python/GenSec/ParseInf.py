@@ -23,6 +23,9 @@ def isxdigit(c:int):
 
 
 #Converts a null terminated ascii string that represents a number into a UINT64 value.
+#A hex number may be preceded by a 0x, but may not be
+#succeeded by an h.A number without 0x or 0X is considered to be base 10
+#unless the IsHex input is true.
 def AsciiStringToUint64(AsciiString:str,IsHex:bool,ReturnValue:int):
     Value = 0
     Index = 0
@@ -73,7 +76,8 @@ def AsciiStringToUint64(AsciiString:str,IsHex:bool,ReturnValue:int):
             Value += CurrentChar - '0'
             Index += 1
         ReturnValue = Value
-    return EFI_SUCCESS
+    Status = EFI_SUCCESS
+    return Status,ReturnValue
 
 
 def isdigit(c:int):
@@ -81,11 +85,13 @@ def isdigit(c:int):
     
 
 #Converts a string to an EFI_GUID.
-def StringToGuid(AsciiGuidBuffer:str,GuidBuffer:EFI_GUID):
+def StringToGuid(AsciiGuidBuffer:str,GuidBuffer:EFI_GUID) -> int:
     Data4 = []*8
     logger =logging.getLogger('GenSec')
+    
     if AsciiGuidBuffer == None or GuidBuffer == None:
         return EFI_INVALID_PARAMETER
+    
     #Check Guid Format strictly xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx
     Index = 0
     while AsciiGuidBuffer[Index] != '\0' and Index < 37:
@@ -106,23 +112,22 @@ def StringToGuid(AsciiGuidBuffer:str,GuidBuffer:EFI_GUID):
         return EFI_ABORTED
 
     #Scan the guid string into the buffer
-    if True:
-       Data1 = AsciiGuidBuffer[0:8]
-       Data2 = AsciiGuidBuffer[8:12]
-       Data3 = AsciiGuidBuffer[12:16]
-       Data4[0] = AsciiGuidBuffer[16:18]
-       Data4[1] = AsciiGuidBuffer[18:20]
-       Data4[2] = AsciiGuidBuffer[20:22]
-       Data4[3] = AsciiGuidBuffer[22:24]
-       Data4[4] = AsciiGuidBuffer[24:26]
-       Data4[5] = AsciiGuidBuffer[26:28]
-       Data4[6] = AsciiGuidBuffer[28:30]
-       Data4[7] = AsciiGuidBuffer[30:32]
-       if len(Data1 + Data2 + Data3+Data4[0]+Data4[1]+Data4[2]+\
-            Data4[3]+Data4[4]+Data4[5]+Data4[6]+Data4[7]) != AsciiGuidBuffer:
-            Index = 0
-       else:
-            Index = 11
+    Index = 11
+    try:
+        Data1 = int(AsciiGuidBuffer[0:8])
+        Data2 = int(AsciiGuidBuffer[9:13])
+        Data3 = int(AsciiGuidBuffer[14:18])
+        Data4[0] = int(AsciiGuidBuffer[19:21])
+        Data4[1] = int(AsciiGuidBuffer[21:23])
+        Data4[2] = int(AsciiGuidBuffer[24:26])
+        Data4[3] = int(AsciiGuidBuffer[26:28])
+        Data4[4] = int(AsciiGuidBuffer[28:30])
+        Data4[5] = int(AsciiGuidBuffer[30:32])
+        Data4[6] = int(AsciiGuidBuffer[32:34])
+        Data4[7] = int(AsciiGuidBuffer[34:36])
+    except:
+        logger.error("Invalid Data value!")
+        Index = 0
 
 
     #Verify the correct number of items were scanned.
@@ -142,3 +147,6 @@ def StringToGuid(AsciiGuidBuffer:str,GuidBuffer:EFI_GUID):
     GuidBuffer.Data4[5]  = Data4[5]
     GuidBuffer.Data4[6]  = Data4[6]
     GuidBuffer.Data4[7]  = Data4[7]
+    
+    Status = EFI_SUCCESS
+    return Status,GuidBuffer
