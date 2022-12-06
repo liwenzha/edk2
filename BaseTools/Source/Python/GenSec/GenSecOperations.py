@@ -79,8 +79,9 @@ mEfiCrc32SectionGuid = EFI_GUID(0xFC1BCDB0,0x7D31,0x49aa,(0x93, 0x6A, 0xA4, 0x60
 def Ascii2UnicodeString(String:str,UniString:str) -> None:
     for ch,ch1 in zip(String,UniString):
         if ch!='\0':
-            ch1 = ch & 0xffff
+            ch1 = ch & 'ffff'
     ch1 ='\0'
+    return UniString
     
 
 #Generate a leaf section of type other than EFI_SECTION_VERSION
@@ -88,7 +89,7 @@ def Ascii2UnicodeString(String:str,UniString:str) -> None:
 #The function won't validate the input file's contents. For
 #common leaf sections, the input file may be a binary file.
 #The utility will add section header to the file.
-def GenSectionCommonLeafSection(SectionType:int,InputFileNum:int,InputFileName=[],OutFileBuffer = b'') -> int:    
+def GenSectionCommonLeafSection(SectionType:int,InputFileNum:int,InputFileName=[],OutFileBuffer = b''):
     
     logger=logging.getLogger('GenSec')
 
@@ -104,7 +105,7 @@ def GenSectionCommonLeafSection(SectionType:int,InputFileNum:int,InputFileName=[
         if InFile == None:
             logger.error("Error opening file %s",InputFileName[0])
             return STATUS_ERROR
-        status = STATUS_ERROR
+        Status = STATUS_ERROR
         Data=InFile.read()
     
     InputFileLength = len(Data)
@@ -127,8 +128,8 @@ def GenSectionCommonLeafSection(SectionType:int,InputFileNum:int,InputFileName=[
         
     #Write result into outputfile
     OutFileBuffer = struct2stream(CommonSect) + Data
-    status = STATUS_SUCCESS
-    return status
+    Status = STATUS_SUCCESS
+    return Status,OutFileBuffer
 
 
 #Converts Align String to align value (1~16M).
@@ -141,23 +142,27 @@ def StringtoAlignment(AlignBuffer:str, AlignNumber:int) -> int:
     for ch in mAlignName:
         if AlignBuffer == ch:
             AlignNumber = 1 << mAlignName.index(ch)
-            return EFI_SUCCESS
+            Status = EFI_SUCCESS
+            return Status,AlignNumber
     return EFI_INVALID_PARAMETER
 
 #Get the contents of all section files specified in InputFileName into FileBuffer
 def GetSectionContents(InputFileNum:int,BufferLength:int,InputFileName=[],InputFileAlign=[],
-                        FileBuffer=b'',)-> int:
+                        FileBuffer=b'',):
     
     logger=logging.getLogger('GenSec')
-
+    
     if InputFileNum < 1:
         logger.error("Invalid parameter, must specify at least one input file")
+        return EFI_INVALID_PARAMETER
     if BufferLength == None:
-         logger.error("Invalid parameter, BufferLength can't be NULL")
+        logger.error("Invalid parameter, BufferLength can't be NULL")
+        return EFI_INVALID_PARAMETER
 
     Size = 0
     Offset = 0 
     TeOffset = 0
+    
 
     #Go through array of file names and copy their contents
     for Index in range(InputFileNum):
@@ -236,38 +241,53 @@ def GetSectionContents(InputFileNum:int,BufferLength:int,InputFileName=[],InputF
         #Buffer must be enough to contain the file content.
         if FileSize > 0 and FileBuffer != None and ((Size + FileSize) <= BufferLength):
             FileBuffer = FileBuffer + Data
+            if len(FileBuffer) == 0:
+                return EFI_ABORTED
         Size += FileSize
 
     #Set the real required buffer size.
     if Size > BufferLength:
         BufferLength = Size
-        return EFI_BUFFER_TOO_SMALL
+        Status = EFI_BUFFER_TOO_SMALL
     else:
         BufferLength = Size
-        return EFI_SUCCESS
+        Status = EFI_SUCCESS
+    return Status,FileBuffer,BufferLength
 
 
 #Generate an encapsulating section of type EFI_SECTION_COMPRESSION
 #Input file must be already sectioned. The function won't validate
 #the input files' contents. Caller should hand in files already
 #with section header.
-def GenSectionCompressionSection(InputFileNum:int,SectCompSubType:int,InputFileName=[],InputFileAlign=[],OutFileBuffer = b'') -> int:    
+def GenSectionCompressionSection(InputFileNum:int,SectCompSubType:int,InputFileName=[],InputFileAlign=[],OutFileBuffer = b''):    
     #Read all input file contenes into a buffer 
     #first get the size of all contents
     
     logger = logging.getLogger('GenSec')
     
-    CompressFunction = None
+    #CompressFunction = None
     FileBuffer = b''
     OutputBuffer = b''
     InputLength = 0
     CompressedLength = 0
-    Status = GetSectionContents(InputFileNum,InputLength,InputFileName,InputFileAlign,FileBuffer)
+    res = GetSectionContents(InputFileNum,InputLength,InputFileName,InputFileAlign,FileBuffer)
+    if type(res) == 'int':
+        Status = res
+    else:
+        Status = res[0]
+        FileBuffer = res[1]
+        InputLength = res[2]
     
     if Status == EFI_BUFFER_TOO_SMALL:
         #Read all input file contents into a buffer
-        Status = GetSectionContents(InputFileNum,InputLength,InputFileName,InputFileAlign,FileBuffer)
-    
+        res = GetSectionContents(InputFileNum,InputLength,InputFileName,InputFileAlign,FileBuffer)
+        if type(res) == 'int':
+            Status = res
+        else:
+            Status = res[0]
+            FileBuffer = res[1]
+            InputLength = res[2]
+        
     if EFI_ERROR(Status):
         return Status
     
@@ -330,7 +350,8 @@ def GenSectionCompressionSection(InputFileNum:int,SectCompSubType:int,InputFileN
         FileBuffer = struct2stream(CompressionSect) + FileBuffer
     
     OutFileBuffer = FileBuffer
-    return EFI_SUCCESS
+    Status = EFI_SUCCESS
+    return Status,OutFileBuffer
 
 
 #Genarate an encapsulating section of type EFI_SECTION_GUID_DEFINED
@@ -347,7 +368,13 @@ def GenSectionGuidDefinedSection(InputFileNum:int,VendorGuid:EFI_GUID,DataAttrib
     Offset = 0
     #Read all input file contents into a buffer
     #first get the size of all file contents
-    Status = GetSectionContents(InputFileNum,InputLength,InputFileName,InputFileAlign,FileBuffer)
+    res = GetSectionContents(InputFileNum,InputLength,InputFileName,InputFileAlign,FileBuffer)
+    if type(res) == 'int':
+        Status = res
+    else:
+        Status = res[0]
+        FileBuffer = res[1]
+        InputLength = res[2]
     
     if Status == EFI_BUFFER_TOO_SMALL:
         if CompareGuid(VendorGuid,mZeroGuid) == 0:
@@ -365,7 +392,13 @@ def GenSectionGuidDefinedSection(InputFileNum:int,VendorGuid:EFI_GUID,DataAttrib
             return EFI_OUT_OF_RESOURCES
         
         #Read all input file contents into a buffer
-        Status = GetSectionContents(InputFileNum,InputLength,InputFileName,InputFileAlign,FileBuffer)
+        res = GetSectionContents(InputFileNum,InputLength,InputFileName,InputFileAlign,FileBuffer)
+        if type(res) == 'int':
+            Status = res
+        else:
+            Status = res[0]
+            FileBuffer = res[1]
+            InputLength = res[2]
     
     if EFI_ERROR(Status):
         logger.error("Error opening file for reading")
@@ -434,7 +467,8 @@ def GenSectionGuidDefinedSection(InputFileNum:int,VendorGuid:EFI_GUID,DataAttrib
             FileBuffer = struct2stream(VendorGuidSect) + FileBuffer
 
     OutFileBuffer = FileBuffer
-    return EFI_SUCCESS
+    Status = EFI_SUCCESS
+    return Status,OutFileBuffer,VendorGuid
 
 
 #Generate a section of type EFI_SECTION_FREEROM_SUBTYPE_GUID
@@ -460,8 +494,14 @@ def GenSectionSubtypeGuidSection(InputFileNum:int,SubTypeGuid:EFI_GUID,
     
     #Read all input file contents into a buffer
     #first get the size of all file contents
-    Status = GetSectionContents(InputFileNum,InputLength,InputFileName,InputFileAlign,FileBuffer)
-    
+    res = GetSectionContents(InputFileNum,InputLength,InputFileName,InputFileAlign,FileBuffer)
+    if type(res) == 'int':
+        Status = res
+    else:
+        Status =res[0]
+        FileBuffer = res[1]
+        InputLength = res[2]
+        
     if Status == EFI_BUFFER_TOO_SMALL:
         Offset = sizeof(EFI_FREEFORM_SUBTYPE_GUID_SECTION)
         if InputLength + Offset >= MAX_SECTION_SIZE:
@@ -469,8 +509,13 @@ def GenSectionSubtypeGuidSection(InputFileNum:int,SubTypeGuid:EFI_GUID,
         TotalLength = InputLength + Offset
         
         #Read all input file contents into a buffer
-        Status = GetSectionContents(InputFileNum,InputLength,InputFileName,InputFileAlign,FileBuffer)
-    
+        res = GetSectionContents(InputFileNum,InputLength,InputFileName,InputFileAlign,FileBuffer)
+        if type(res) == 'int':
+            Status = res
+        else:
+            Status =res[0]
+            FileBuffer = res[1]
+            InputLength = res[2]
     if EFI_ERROR(Status):
         logger.error("Error opening file for reading")
         return Status
@@ -500,8 +545,9 @@ def GenSectionSubtypeGuidSection(InputFileNum:int,SubTypeGuid:EFI_GUID,
         SubtypeGuidSect2.SubTypeGuid = SubTypeGuid
         FileBuffer = struct2stream(SubtypeGuidSect) + FileBuffer
 
-    OutFileBuffer =FileBuffer
-    return EFI_SUCCESS
+    OutFileBuffer = FileBuffer
+    Status = EFI_SUCCESS
+    return Status,OutFileBuffer,SubTypeGuid
 
 
 #Support routine for th PE/COFF file Loader that reads a buffer from a PE/COFF file
@@ -515,14 +561,13 @@ def FfsRebaseImageRead(FileOffset:int,ReadSize:int,FileHandle = b'',Buffer = b''
     #     Source8 += 1
     #     #Length -= 1
     Destination8 += Source8[0:Length]
-    return EFI_SUCCESS
+    Status = EFI_SUCCESS
+    return Status,ReadSize,Buffer
 
 
 #InFile is input file for getting alignment
 #return the alignment
 def GetAlignmentFromFile(InFile:str,Alignment:int) -> int:
-    
-    logger = logging.getLogger('GenSec')
 
     PeFileBuffer = b''
     
@@ -546,4 +591,5 @@ def GetAlignmentFromFile(InFile:str,Alignment:int) -> int:
         return Status
     
     Alignment = ImageContext.SectionAlignment
-    return EFI_SUCCESS
+    Status = EFI_SUCCESS
+    return Status,Alignment

@@ -1855,7 +1855,7 @@ Returns:
     VersionSect->CommonHeader.Size[1]  = (UINT8) ((Index & 0xff00) >> 8);
     VersionSect->CommonHeader.Size[2]  = (UINT8) ((Index & 0xff0000) >> 16);
     VersionSect->BuildNumber           = (UINT16) VersionNumber;
-    Ascii2UnicodeString (StringBuffer, VersionSect->VersionString);
+    VersionSect->VersionString = Ascii2UnicodeString (StringBuffer, VersionSect->VersionString);
     VerboseMsg ("the size of the created section file is %u bytes", (unsigned) Index);
     break;
 
@@ -1875,7 +1875,7 @@ Returns:
     UiSect->CommonHeader.Size[0]  = (UINT8) (Index & 0xff);
     UiSect->CommonHeader.Size[1]  = (UINT8) ((Index & 0xff00) >> 8);
     UiSect->CommonHeader.Size[2]  = (UINT8) ((Index & 0xff0000) >> 16);
-    Ascii2UnicodeString (StringBuffer, UiSect->FileNameString);
+    UiSect->FileNameString = Ascii2UnicodeString (StringBuffer, UiSect->FileNameString);
     VerboseMsg ("the size of the created section file is %u bytes", (unsigned) Index);
    break;
 

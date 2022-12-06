@@ -20,6 +20,10 @@ NPT = NT
 TBIT = 5
 CBIT = 9
 PBIT = 4
+NIL = 0
+mBitCount = 0
+mRemainder = 0
+
 
 UINT8_BIT = 8
 mSubBitBuf = None
@@ -32,6 +36,8 @@ mDstAdd = 0
 mSrcUpperLimit = 0
 mDstUpperLimit = 0
 mCrc = 0
+mOutputPos = 0
+mOutputMask = 0
 
 mLevel = []
 mCLen = []*NC
@@ -44,25 +50,27 @@ mHeap = []*(NC + 1)
 mLeft = []*(2 * NC - 1)
 mRight = []*(2 * NC - 1)
 mLenCnt = [] * 17
-mText = b''
+mText = []
 mChildCount = []
 mBuf = []
-mMatchLen = None
+mMatchLen = 0
 mBufSiz = 0
 mFreq = []
-mN = None
+mSortPtr = []
+mSortPtrAdd = 0
+mN = 0
 
 mCFreq = []
 mCrcTable = []
 mPFreq = []
-mPos =None
-mMatchPos = None
-mAvail =None
+mPos = 0
+mMatchPos = 0
+mAvail =0
 mPosition = []
 mParent = []
 mNext = []
 mPrev = []
-mHeapSize = None
+mHeapSize = 0
 
 INIT_CRC = 0
 CRCPOLY = 0xA001
@@ -82,7 +90,7 @@ def EFI_ERROR(A):
 
 #Put a dword to output stream
 def PutDword(Data:int):
-
+    global mDst, mDstAdd
     if mDstAdd < mDstUpperLimit:
         mDst = mDst + bytes(Data & 0xff)
         mDstAdd += 1
@@ -115,23 +123,24 @@ def MakeCrcTable():
 def InitSlide():
     for i in range(WNDSIZ, WNDSIZ + UINT8_MAX):
         mLevel[i] = 1
-        mPosition[i] = 0
+        mPosition[i] = NIL
         
     for i in range(WNDSIZ, WNDSIZ*2):
-        mParent[i] = 0
+        mParent[i] = NIL
     mAvail = 1
     
     for i in range(WNDSIZ - 1):
         mNext[i]  = i + 1
         
-    mNext[WNDSIZ - 1] = 0
+    mNext[WNDSIZ - 1] = NIL
     
     for i in range(MAX_HASH_VAL+1):
-        mNext[i] = 0
+        mNext[i] = NIL
 
 
 #Count the number of each code length for a Huffman tree
 def InitPutBits():
+    global mBitCount
     mBitCount = UINT8_BIT
     mSubBitBuf = 0
 
@@ -143,8 +152,10 @@ def HufEncodeStart():
     for i in range(NP):
         mPFreq[i] = 0
         
+    global mOutputPos,mOutputMask
     mOutputPos = mOutputMask = 0
     InitPutBits()
+    return
 
 
 def UPDATE_CRC(a):
@@ -155,10 +166,11 @@ def UPDATE_CRC(a):
 #Read in source data
 def FreadCrc(p:int,n:int) -> int:
     i = 0
+    global mSrcAdd,mSrcUpperLimit,mOrigSize
     mSrcAdd = 0
     while mSrcAdd < mSrcUpperLimit and i < n:
         p = p + mSrc[i:i+1]
-        mSrcAdd += 1
+        mSrcAdd += 17
         i += 1
     n = i
     
@@ -173,7 +185,7 @@ def FreadCrc(p:int,n:int) -> int:
 #Find child node given the parent node and the edge character
 def Child(q:c_int16,c:c_uint8):
     r =mNext[HASH(q,c)]
-    mParent[0] = q
+    mParent[NIL] = q
     while mParent[r] != q:
         r = mNext[r]
     return r
@@ -193,6 +205,8 @@ def MakeChild(q:c_int16,c:c_uint8,r:c_int16):
 
 #Split a node
 def Split(Old:c_int16):
+    global mAvail,mMatchPos,mMatchLen,mPos
+    
     New = mAvail
     mAvail = mNext[New]
     mChildCount[New] = 0
@@ -211,6 +225,8 @@ def Split(Old:c_int16):
 
 #Outputs rightmost n bits of x
 def PutBits(n:c_uint32,x:c_uint32):
+    global mBitCount,mSubBitBuf,mDstUpperLimit,mDst,mDstAdd
+    
     if n < mBitCount:
         mBitCount -= n
         mSubBitBuf |= x << mBitCount
@@ -335,6 +351,7 @@ def CountTFreq():
 
 def DownHeap(i:c_uint32):
     #Priority queue: send i-th entry down heap
+    global mHeapSize
     k = mHeap[i]
     j = 2 * i
     while j <= mHeapSize:
@@ -380,8 +397,8 @@ def MakeLen(Root:c_int32):
     for i in range(16,0,-1):
         k = mLenCnt[i]
         while ( k - 1 >= 0):
-            mLen[mSortPtr] = i
-            mSortPtr += 1
+            mLen[mSortPtr[mSortPtrAdd]] = i
+            mSortPtrAdd += 1
 
 
 def MakeCode(n:c_int32,Len:c_uint8=[],Code:c_uint16  =[]):
@@ -395,7 +412,9 @@ def MakeCode(n:c_int32,Len:c_uint8=[],Code:c_uint16  =[]):
 
                 
 #Generates Huffman codes given a frequency distribution of symbols
-def MakeTree(NParm:c_int32,FreqParm:c_uint16 = [],LenParm:c_uint8 = [],CodeParm:c_uint16 = []):
+def MakeTree(NParm:c_int32,FreqParm = [],LenParm= [],CodeParm = []):
+    global mN,mHeapSize,mSortPtr,mSortPtrAdd
+    
     mN = NParm
     mFreq = FreqParm
     mLen = LenParm
@@ -413,6 +432,29 @@ def MakeTree(NParm:c_int32,FreqParm:c_uint16 = [],LenParm:c_uint8 = [],CodeParm:
         #Make priority queue
         DownHeap(i)
     mSortPtr = CodeParm
+    mSortPtrAdd = 0
+    
+    
+    i = mHeap[1]
+    if i < mN:
+        mSortPtr = i
+        mSortPtr += 1
+    mHeap[1] = mHeap[mHeapSize]
+    mHeapSize -= 1
+    DownHeap(1)
+    j = mHeap[1]
+    if j < mN:
+        mSortPtr[mSortPtrAdd] = j
+        mSortPtrAdd += 1
+    k = Avail
+    Avail += 1
+    mFreq[k] = mFreq[i] + mFreq[j]
+    mHeap[1] = k
+    DownHeap(1)
+    mLeft[k] = i
+    mRight[k] = j
+        
+        
     while mHeapSize > 1:
         i = mHeap[1]
         if i < mN:
@@ -423,8 +465,8 @@ def MakeTree(NParm:c_int32,FreqParm:c_uint16 = [],LenParm:c_uint8 = [],CodeParm:
         DownHeap(1)
         j = mHeap[1]
         if j < mN:
-            mSortPtr = j
-            mSortPtr += 1
+            mSortPtr[mSortPtrAdd] = j
+            mSortPtrAdd += 1
         k = Avail
         Avail += 1
         mFreq[k] = mFreq[i] + mFreq[j]
@@ -434,6 +476,7 @@ def MakeTree(NParm:c_int32,FreqParm:c_uint16 = [],LenParm:c_uint8 = [],CodeParm:
         mRight[k] = j
         
     mSortPtr = CodeParm
+    mSortPtrAdd = 0
     MakeLen(k)
     MakeCode(NParm, LenParm, CodeParm)
     return k
@@ -441,8 +484,10 @@ def MakeTree(NParm:c_int32,FreqParm:c_uint16 = [],LenParm:c_uint8 = [],CodeParm:
 
 #Huffman code the block and output it
 def SendBlock():
+    global mCFreq
     Root = MakeTree(NC, mCFreq, mCLen, mCCode)
     Size = mCFreq[Root]
+    PutBits(16, Size)
     if Root >= NC:
         CountTFreq()
         Root = MakeTree(NT, mTFreq, mPTLen, mPTCode)
@@ -489,6 +534,8 @@ def SendBlock():
 
 #Outputs an Original Character or a Pointer
 def Output(c:c_uint32,p:c_uint32):
+    global mOutputMask,mOutputPos,mBufSiz
+    
     if mOutputMask >> 1 == 0:
         mOutputMask = 1 << (UINT8_BIT - 1)
         if mOutputPos >= mBufSiz - 3 * UINT8_BIT:
@@ -515,12 +562,13 @@ def Output(c:c_uint32,p:c_uint32):
 
 #Insert string info for current position into the String Info Log
 def InsertNode():
+    global mMatchLen,mMatchPos,mPos
     
     if mMatchLen >= 4:
         mMatchLen -= 1
         r = (mMatchPos + 1) | WNDSIZ
         q = mParent[r]
-        while q == 0:
+        while q == NIL:
             r = mNext[r]
         while mLevel[q] >= mMatchLen:
             r = q
@@ -532,10 +580,11 @@ def InsertNode():
         if t < WNDSIZ:
             mPosition[t] = mPos | PERC_FLAG
     else:
+        #Locate the target tree
         q = mText[mPos] + WNDSIZ
         c = mText[mPos + 1]
         r = Child(q, c)
-        if r == 0:
+        if r == NIL:
             MakeChild(q, c, mPos)
             mMatchLen = 1
             return
@@ -552,13 +601,10 @@ def InsertNode():
             mMatchPos = mPosition[r] & ~PERC_FLAG
         if mMatchPos >= mPos:
             mMatchPos -= WNDSIZ
+            
         index1= mPos + mMatchLen
-        #t1 = mText[index1]
-        
         index2 = mMatchPos + mMatchLen
-        #t2 = mText[index2]
         
-
         while mMatchLen < j:
             if mText[index1] != mText[index2]:
                 Split(r)
@@ -571,37 +617,77 @@ def InsertNode():
         mPosition[r] = mPos
         q = r
         r = Child(q, mText[index1])
-        if r == 0:
-
+        if r == NIL:
             MakeChild(q, mText[index1], mPos)
             return
         mMatchLen +=1
-        t = mPrev[r]
-        mPrev[mPos] = t
-        mNext[t] = mPos
-        t = mNext[r]
-        mNext[mPos] = t
-        mPrev[t] = mPos
-        mParent[mPos] = q
-        mParent[r] = 0
-        mNext[r] = mPos
+    t = mPrev[r]
+    mPrev[mPos] = t
+    mNext[t] = mPos
+    t = mNext[r]
+    mNext[mPos] = t
+    mPrev[t] = mPos
+    mParent[mPos] = q
+    mParent[r] = NIL
+    
+    #Special usage of 'next'
+    mNext[r] = mPos
 
 
 #Delete outdated string info.
 def DeleteNode():
-    if mParent[mPos] == 0:
+    global mPos,mAvail
+    if mParent[mPos] == NIL:
         return
     r = mPrev[mPos]
     s = mNext[mPos]
     mNext[r] = s
     mPrev[s] = r
     r = mParent[mPos]
-    mParent[mPos] = 0
-
+    mParent[mPos] = NIL
+    if r >= WNDSIZ or mChildCount[r] - 1 > 1:
+        return
+    
+    t = mPosition[r] & ~PERC_FLAG
+    if t >= mPos:
+        t -= WNDSIZ
+    s = t
+    q = mParent[r]
+    u = mPosition[q]
+    while u & PERC_FLAG:
+        u &= ~PERC_FLAG
+        if u >= mPos:
+            u -= WNDSIZ
+        if u > s:
+            s = u
+        mPosition[q] = s | WNDSIZ
+        q = mParent[q]
+    if q < WNDSIZ:
+        if u >= mPos:
+            u -= WNDSIZ
+        if u > s:
+            s = u
+        mPosition[q] = s | WNDSIZ | PERC_FLAG
+    s = Child(r, mText[t + mLevel[r]])
+    t = mPrev[s]
+    u = mNext[s]
+    mNext[t] = u
+    mPrev[u] = t
+    t = mPrev[r]
+    mNext[t] = s
+    mPrev[s] = t
+    t = mNext[r]
+    mPrev[t] = s
+    mNext[s] = t
+    mParent[s] = mParent[r]
+    mParent[r] = NIL
+    mNext[r] = mAvail
+    mAvail = r
 
 #Advance the current position (read in new data if needed).
 #Delete outdated string info. Find a match string for current position.
 def GetNextMatch():
+    global mRemainder,mPos
     mRemainder -= 1
     if mPos + 1 == WNDSIZ * 2:
         memmove(mText[0], mText[WNDSIZ], WNDSIZ + MAXMATCH)
@@ -622,12 +708,12 @@ def HufEncodeEnd():
 #The main controlling routine for compression process.
 def Encode() -> int:
     for i in range(WNDSIZ):
-        mText = mText +b'0'
+        mText.append(0)
         
     InitSlide()
     HufEncodeStart()
 
-
+    global mRemainder,mMatchLen,mPos
     mRemainder = FreadCrc(mText[WNDSIZ],WNDSIZ + MAXMATCH)
     mMatchLen = 0
     mPos = WNDSIZ
@@ -655,18 +741,16 @@ def Encode() -> int:
 
 
 #The main compression routine.
-def EfiCompress(SrcSize:int,DstSize:int,SrcBuffer = b'',DstBuffer = b'') -> c_uint64:
+def EfiCompress(SrcSize:int,DstSize:int,SrcBuffer = b'',DstBuffer = b''):
     
+    global mSrc,mSrcAdd,mSrcUpperLimit,mDst,mDstAdd,mDstUpperLimit,mOrigSize, mCompSize,
     Status = EFI_SUCCESS
     
     mSrc = SrcBuffer
-    
     mSrcAdd = 0
-    # mSrc = mSrc.decode()
     mSrcUpperLimit = mSrcAdd + SrcSize
     mDst = DstBuffer
-    #mDstAdd = 0
-    # mDst = mDst.decode()
+    mDstAdd = 0
     mDstUpperLimit = mDstAdd + DstSize
     
     PutDword(0)

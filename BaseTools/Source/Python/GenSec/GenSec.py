@@ -103,13 +103,19 @@ def main():
             return STATUS_ERROR
             
     if args.Compress:
-        CompressionName = args.Type
+        CompressionName = args.Compress
         if CompressionName == None:
             logger.error("Invalid option value, Compression Type can't be NULL")
             return STATUS_ERROR 
             
     if args.GuidValue:
-        Status = StringToGuid(args.GuidValue,VendorGuid)
+        res = StringToGuid(args.GuidValue,VendorGuid)
+        if type(res) == 'int':
+            Status = res
+        else:
+            Status = res[0]
+            VendorGuid = res[1]
+            
         if EFI_ERROR (Status):
             logger.error("Invalid option value")
             return STATUS_ERROR
@@ -136,7 +142,13 @@ def main():
             return STATUS_ERROR
     
     if args.GuidHeaderLength:
-        Status = AsciiStringToUint64(args.GuidHeaderLength,False,SectGuidHeaderLength)
+        res = AsciiStringToUint64(args.GuidHeaderLength,False,SectGuidHeaderLength)
+        if type(res) == 'int':
+            Status = res
+        else:
+            Status = res[0]
+            SectGuidHeaderLength = res[1]
+            
         if EFI_ERROR (Status):
             logger.error("Invalid option value for GuidHeaderLength")
             return STATUS_ERROR
@@ -179,7 +191,13 @@ def main():
         if args.SectionAlign == "0":
             InputFileAlign[InputFileAlignNum] = 0
         else:
-            Status = StringtoAlignment(args.SectionAlign,InputFileAlign[InputFileAlignNum])
+            res = StringtoAlignment(args.SectionAlign,InputFileAlign[InputFileAlignNum])
+            if type(res) == 'int':
+                Status = res
+            else:
+                Status = res[0]
+                AlignNumber = res[1]
+                
             if EFI_ERROR (Status):
                 logger.error("Invalid option value")
                 return STATUS_ERROR
@@ -197,7 +215,7 @@ def main():
     # for i in range(InputFileNum):
     InputFileName[InputFileNum] = sys.argv[1]
     InputFileNum += 1
-    #到此为止，命令行的读取结束，且已经得到了文件名称
+    #到此为止，命令行的读取结束，且已经得到了文件名称,上面的位置参数明天必须搞定
     
     
     #这里开始对于读取到的参数进行分析处理
@@ -206,9 +224,16 @@ def main():
         return STATUS_ERROR
     for Index in range(InputFileAlignNum):
         if InputFileAlign[Index] == 0:
-            Status = GetAlignmentFromFile(InputFileName[Index], InputFileAlign[Index])
+            res = GetAlignmentFromFile(InputFileName[Index], InputFileAlign[Index])
+            if type(res) == 'int':
+                Status = res
+            else:
+                Status =res[0]
+                InputFileAlign[Index] = res[1]
+                
             if EFI_ERROR(Status):
                 logger.error("Fail to get Alignment from %s",InputFileName[InputFileNum])
+                return STATUS_ERROR
     
     if DummyFileName:
         #Open file and read contents
@@ -318,13 +343,30 @@ def main():
     #With in this switch,build and write out the section header including any section
     #type specific pieces. If there is an input file, it's tacked on later
     if SectType == EFI_SECTION_COMPRESSION:
-        Status = GenSectionCompressionSection(InputFileNum,SectCompSubType,InputFileName,InputFileAlign,OutFileBuffer)
-    
+        res = GenSectionCompressionSection(InputFileNum,SectCompSubType,InputFileName,InputFileAlign,OutFileBuffer)
+        if type(res) == 'int':
+            Status = res
+        else:
+            Status =res[0]
+            OutFileBuffer = res[1]
+            
     elif SectType == EFI_SECTION_GUID_DEFINED:
-        Status = GenSectionGuidDefinedSection(InputFileNum,VendorGuid,SectGuidAttribute,SectGuidHeaderLength,InputFileName,InputFileAlign,OutFileBuffer)
-        
+        res = GenSectionGuidDefinedSection(InputFileNum,VendorGuid,SectGuidAttribute,SectGuidHeaderLength,InputFileName,InputFileAlign,OutFileBuffer)
+        if type(res) == 'int':
+            Status = res
+        else:
+            Status =res[0]
+            OutFileBuffer = res[1]
+            VendorGuid = res[2]
+         
     elif SectType == EFI_SECTION_FREEFORM_SUBTYPE_GUID:
-        Status == GenSectionSubtypeGuidSection(InputFileNum,VendorGuid,InputFileName,InputFileAlign,OutFileBuffer)
+        res = GenSectionSubtypeGuidSection(InputFileNum,VendorGuid,InputFileName,InputFileAlign,OutFileBuffer)
+        if type(res) == 'int':
+            Status = res
+        else:
+            Status =res[0]
+            OutFileBuffer = res[1]
+            SubTypeGuid = res[2]
         
     elif SectType == EFI_SECTION_VERSION:
         Index = sizeof(EFI_COMMON_SECTION_HEADER)
@@ -336,7 +378,7 @@ def main():
         VersionSect.CommonHeader.SET_SECTION_SIZE(Index)
         VersionSect.BuildNumber = VersionNumber
         OutFileBuffer = struct2stream(VersionSect)
-        Ascii2UnicodeString(StringBuffer,VersionSect.VersionString)
+        VersionSect.VersionString = Ascii2UnicodeString(StringBuffer,VersionSect.VersionString)
         
     elif SectType == EFI_SECTION_USER_INTERFACE:
         Index = sizeof (EFI_COMMON_SECTION_HEADER)
@@ -358,11 +400,13 @@ def main():
     
     else:
         #All other section types are caught by default(they're all the same)
-        Status =  GenSectionCommonLeafSection(SectType,InputFileNum,InputFileName,OutFileBuffer)
+        res =  GenSectionCommonLeafSection(SectType,InputFileNum,InputFileName,OutFileBuffer)
+        if type(res) == 'int':
+            Status = res
+        else:
+            Status = res[0]
+            OutFileBuffer = res[1]
         
-    if Status != EFI_SUCCESS or OutFileBuffer == None:
-        logger.error("Status is not successful, Status value is 0x%X",int(Status))
-        #return STATUS_ERROR
         
     #Get output file length
     if SectType != EFI_SECTION_ALL:
