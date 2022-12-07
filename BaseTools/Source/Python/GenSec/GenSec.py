@@ -215,10 +215,10 @@ def main():
     # for i in range(InputFileNum):
     InputFileName[InputFileNum] = sys.argv[1]
     InputFileNum += 1
-    #到此为止，命令行的读取结束，且已经得到了文件名称,上面的位置参数明天必须搞定
     
     
-    #这里开始对于读取到的参数进行分析处理
+    
+    
     if InputFileAlignNum > 0 and InputFileAlignNum != InputFileNum:
         logger.error("Invalid option, section alignment must be set for each section")
         return STATUS_ERROR
@@ -394,10 +394,23 @@ def main():
         #Read all input file contents into a buffer
         #first fet the size of all file contents
         
-        Status = GetSectionContents(InputFileNum,InputLength,InputFileName,InputFileAlign,OutFileBuffer)
+        res = GetSectionContents(InputFileNum,InputLength,InputFileName,InputFileAlign,OutFileBuffer)
+        if type(res) == 'int':
+            Status = res
+        else:
+            Status = res[0]
+            OutFileBuffer = res[1]
+            InputLength = res[2]
+            
         if Status == EFI_BUFFER_TOO_SMALL:
-            Status = GetSectionContents(InputFileNum,InputLength,InputFileName,InputFileAlign,OutFileBuffer)
-    
+            res = GetSectionContents(InputFileNum,InputLength,InputFileName,InputFileAlign,OutFileBuffer)
+            if type(res) == 'int':
+                Status = res
+            else:
+                Status = res[0]
+                OutFileBuffer = res[1]
+                InputLength = res[2]
+            
     else:
         #All other section types are caught by default(they're all the same)
         res =  GenSectionCommonLeafSection(SectType,InputFileNum,InputFileName,OutFileBuffer)
