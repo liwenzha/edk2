@@ -743,7 +743,7 @@ def Encode() -> int:
 #The main compression routine.
 def EfiCompress(SrcSize:int,DstSize:int,SrcBuffer = b'',DstBuffer = b''):
     
-    global mSrc,mSrcAdd,mSrcUpperLimit,mDst,mDstAdd,mDstUpperLimit,mOrigSize, mCompSize,
+    global mSrc,mSrcAdd,mSrcUpperLimit,mDst,mDstAdd,mDstUpperLimit,mOrigSize, mCompSize
     Status = EFI_SUCCESS
     
     mSrc = SrcBuffer
