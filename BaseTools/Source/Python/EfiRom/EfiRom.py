@@ -15,6 +15,7 @@ import argparse
 import logging
 from EfiStruct import *
 from Common.EfiCompress import *
+from Common.ParseInf import *
 from FirmwareStorageFormat.SectionHeader import *
 
 STATUS_SUCCESS = 0
