@@ -14,7 +14,7 @@ import sys
 import argparse
 import logging
 from EfiStruct import *
-from Common import EfiCompress
+from Common.EfiCompress import *
 from FirmwareStorageFormat.SectionHeader import *
 
 STATUS_SUCCESS = 0
@@ -470,6 +470,18 @@ def GetMachineTypeStr(MachineType) -> str:
     while mMachineTypes[Index].Name != None:
         if mMachineTypes[Index].Value == MachineType:
             return mMachineTypes[Index].Name
+        Index += 1
+    
+    return "unknown"
+
+
+#GC_TODO: Add function description
+def GetSubsystemTypeStr(SubsystemType) -> str:
+    Index = 0
+    while mSubsystemTypes[Index].Name != None:
+        if mSubsystemTypes[Index].Value == SubsystemType:
+            return mSubsystemTypes[Index].Name
+        Index += 1
     
     return "unknown"
 
@@ -608,7 +620,7 @@ def DumpImage(InFile:FILE_LIST):
                 print("(not compressed)\n")
             
             print("    Machine type           0x%04x (%s)\n" %(EfiRomHdr.EfiMachineType,GetMachineTypeStr (EfiRomHdr.EfiMachineType)) )
-            print("    Machine type           0x%04x (%s)\n" %(EfiRomHdr.EfiSubsystem,GetMachineTypeStr (EfiRomHdr.EfiSubsystem)) )
+            print("    Subsystem              0x%04x (%s)\n" %(EfiRomHdr.EfiSubsystem,GetSubsystemTypeStr (EfiRomHdr.EfiSubsystem)) )
             print("    EFI image offset       0x%04x (@0x%x)\n" %(EfiRomHdr.EfiImageHeaderOffset,EfiRomHdr.EfiImageHeaderOffset + ImageStart))
         else:
             #Not an EFI image
@@ -642,6 +654,48 @@ def main():
         return STATUS_ERROR
 
     #If dumping an image, then do that and quit
+    if mOptions.DumpOption == 1:
+        if mOptions.FileList != None:
+            if mOptions.FileList.FileName.find(DEFAULT_OUTPUT_EXTENSION) != -1:
+                DumpImage(mOptions.FileList)
+                BilOut
+            else:
+                logger.error("No PciRom input file, No *.rom input file")
+                BailOut
+    
+    #Determine the output filename. Either what they specified on
+    #the command line, or the first input filename with a different extension.
+    if mOptions.OutFileName[0] == None:
+        if mOptions.FileList != None:
+            if len(mOptions.FileList.FileName) >= MAX_PATH:
+                Status = STATUS_ERROR
+                logger.error("Invalid parameter", "Input file name is too long - %s." %mOptions.FileList.FileName)
+                BailOut
+            mOptions.OutFileName = mOptions.FileList.FileName[0:MAX_PATH - 1]
+            mOptions.OutFileName[MAX_PATH - 1] = 0
+            
+            #Find the last . on the line and replace the filename extension with
+            #the default
+            ExtAdd = len (mOptions.OutFileName) - 1
+            while ExtAdd >= mOptions.OutFileName:
+                if (Ext[ExtAdd] == '.') or (Ext[ExtAdd] == '\\'):
+                    break
+                ExtAdd -= 1
+                
+            #If dot here,then insert extension here, otherwise append
+            if (Ext[ExtAdd] != '.'):
+                ExtAdd = len (mOptions.OutFileName)
+            Ext = DEFAULT_OUTPUT_EXTENSION
+            
+    #Make sure we don't have the same filename for input and output files
+    pass
+
+    #Now open our output file
+    with open(mOptions.OutFileName,"wb") as FptrOut:
+        Data = FptrOut.read()
+        if len(Data) == 0:
+            logger.error("Error opening file", "Error opening file %s" %mOptions.OutFileName)
+            BailOut
     
 if __name__ == "__main__":
     exit(main())
