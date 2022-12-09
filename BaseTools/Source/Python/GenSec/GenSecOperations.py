@@ -53,26 +53,18 @@ mSectionTypeName =[
 ]
 
 
-mCompressionTypeName={ "PI_NONE", "PI_STD" }
+mCompressionTypeName = ["PI_NONE", "PI_STD"]
 
 EFI_GUIDED_SECTION_NONE=0x80
-mGUIDedSectionAttribue={"NONE", "PROCESSING_REQUIRED", "AUTH_STATUS_VALID"}
+mGUIDedSectionAttribue=["NONE", "PROCESSING_REQUIRED", "AUTH_STATUS_VALID"]
 
-mAlignName={"1", "2", "4", "8", "16", "32", "64", "128", "256", "512",
+mAlignName=["1", "2", "4", "8", "16", "32", "64", "128", "256", "512",
   "1K", "2K", "4K", "8K", "16K", "32K", "64K", "128K", "256K",
-  "512K", "1M", "2M", "4M", "8M", "16M"}
+  "512K", "1M", "2M", "4M", "8M", "16M"]
 
 mZeroGuid = EFI_GUID(0x0,0x0,0x0,(0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0))
-# mZeroGuid.Data1 = 0x0
-# mZeroGuid.Data2 = 0x0
-# mZeroGuid.Data3 = 0x0
-# mZeroGuid.Data4 = (0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0)
 
 mEfiCrc32SectionGuid = EFI_GUID(0xFC1BCDB0,0x7D31,0x49aa,(0x93, 0x6A, 0xA4, 0x60, 0x0D, 0x9D, 0xD0, 0x83))
-# mEfiCrc32SectionGuid.Data1 = 0xFC1BCDB0
-# mEfiCrc32SectionGuid.Data2 = 0x7D31
-# mEfiCrc32SectionGuid.Data3 = 0x49aa
-# mEfiCrc32SectionGuid.Data4 = (0x93, 0x6A, 0xA4, 0x60, 0x0D, 0x9D, 0xD0, 0x83)
 
 
 #Write ascii string as unicode string format to FILE
@@ -314,7 +306,13 @@ def GenSectionCompressionSection(InputFileNum:int,SectCompSubType:int,InputFileN
     
     #Actual compressing 
     if CompressFunction != None:
-        Status = CompressFunction(InputLength,CompressedLength,FileBuffer,OutputBuffer)
+        res = CompressFunction(InputLength,CompressedLength,FileBuffer,OutputBuffer)
+        if type(res) == 'int':
+            Status = res
+        else:
+            Status = res[0]
+            OutputBuffer = res[1]
+            
         if Status == EFI_BUFFER_TOO_SMALL:
             HeaderLength = sizeof(EFI_COMPRESSION_SECTION)
             if CompressedLength + HeaderLength >= MAX_SECTION_SIZE:

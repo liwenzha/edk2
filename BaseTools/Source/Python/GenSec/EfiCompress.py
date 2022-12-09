@@ -781,7 +781,9 @@ def EfiCompress(SrcSize:int,DstSize:int,SrcBuffer = b'',DstBuffer = b''):
     #Return
     if mCompSize + 1 + 8 > DstSize:
         DstSize = mCompSize + 1 + 8
-        return EFI_BUFFER_TOO_SMALL
+        Status = EFI_BUFFER_TOO_SMALL
     else:
         DstSize = mCompSize + 1 + 8
-        return EFI_SUCCESS
+        Status =  EFI_SUCCESS
+    
+    return Status,DstBuffer
