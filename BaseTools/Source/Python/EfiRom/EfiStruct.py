@@ -11,7 +11,7 @@
 
 from ctypes import *
 from struct import *
-from Common import PeCoff
+from Common.PeCoff import *
 
 def SIGNATURE_16(A,B):
     return A | B << 8
@@ -323,7 +323,7 @@ class STRING_LOOKUP(Structure):
     ]
     
 
-STRING_LOOKUP mSubsystemTypes[] =[
+mSubsystemTypes =[
     STRING_LOOKUP(EFI_IMAGE_MACHINE_IA32, "IA32"),
     STRING_LOOKUP(EFI_IMAGE_MACHINE_X64, "X64"),
     STRING_LOOKUP(EFI_IMAGE_MACHINE_EBC, "EBC"),
