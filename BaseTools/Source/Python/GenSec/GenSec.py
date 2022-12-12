@@ -23,6 +23,7 @@ UTILITY_MINOR_VERSION = 1
 
 
 parser=argparse.ArgumentParser(description="Create Firmware File Section files  per PI Spec")
+parser.add_argument("-i",dest = "input",help = "Input file name")
 parser.add_argument("-o","--outputfile",dest="output",help="File is the SectionFile to be created.")
 parser.add_argument("-s","--sectiontype",dest="SectionType",help="SectionType defined in PI spec is one type of\
                     EFI_SECTION_COMPRESSION, EFI_SECTION_GUID_DEFINED,EFI_SECTION_PE32, \
@@ -61,8 +62,8 @@ def main():
     InputFileAlignNum = 0
     MAXIMUM_INPUT_FILE_NUM = 10
     InputFileNum = 0
-    InputFileName = []
-    InputFileAlign = []
+    InputFileName = ['0']*100
+    InputFileAlign = [0]*100
     InputLength = 0
     OutFileBuffer = b''
     StringBuffer = ''
@@ -70,6 +71,7 @@ def main():
     SectType = EFI_SECTION_ALL
     SectGuidAttribute = EFI_GUIDED_SECTION_NONE
     Status = STATUS_SUCCESS
+    DummyFileName = ''
     
     args = parser.parse_args()
     argc = len(sys.argv)
@@ -190,13 +192,14 @@ def main():
 
         if args.SectionAlign == "0":
             InputFileAlign[InputFileAlignNum] = 0
+            #InputFileAlign.append(0)
         else:
             res = StringtoAlignment(args.SectionAlign,InputFileAlign[InputFileAlignNum])
             if type(res) == 'int':
                 Status = res
             else:
                 Status = res[0]
-                AlignNumber = res[1]
+                InputFileAlign[InputFileAlignNum] = res[1]
                 
             if EFI_ERROR (Status):
                 logger.error("Invalid option value")
@@ -213,11 +216,11 @@ def main():
     #         InputFileName[i] = '0'
             
     # for i in range(InputFileNum):
-    InputFileName[InputFileNum] = sys.argv[1]
-    InputFileNum += 1
-    
-    
-    
+    if args.input:
+        InputFileName[InputFileNum] = args.input
+        #InputFileName.append(args.input)
+        InputFileNum += 1
+
     
     if InputFileAlignNum > 0 and InputFileAlignNum != InputFileNum:
         logger.error("Invalid option, section alignment must be set for each section")
@@ -351,13 +354,15 @@ def main():
             OutFileBuffer = res[1]
             
     elif SectType == EFI_SECTION_GUID_DEFINED:
+        print(VendorGuid.Data1)
+        print(mZeroGuid.Data1)
         res = GenSectionGuidDefinedSection(InputFileNum,VendorGuid,SectGuidAttribute,SectGuidHeaderLength,InputFileName,InputFileAlign,OutFileBuffer)
         if type(res) == 'int':
             Status = res
         else:
             Status =res[0]
             OutFileBuffer = res[1]
-            VendorGuid = res[2]
+            # VendorGuid = res[2]
          
     elif SectType == EFI_SECTION_FREEFORM_SUBTYPE_GUID:
         res = GenSectionSubtypeGuidSection(InputFileNum,VendorGuid,InputFileName,InputFileAlign,OutFileBuffer)
@@ -423,10 +428,13 @@ def main():
         
     #Get output file length
     if SectType != EFI_SECTION_ALL:
-        SectionHeader = EFI_COMMON_SECTION_HEADER(OutFileBuffer[0:sizeof(EFI_COMMON_SECTION_HEADER)])
-        InputLength = SectionHeader.Size & 0x00ffffff
+        #SectionHeader = EFI_COMMON_SECTION_HEADER(OutFileBuffer[0:sizeof(EFI_COMMON_SECTION_HEADER)])
+        SectionHeader = EFI_COMMON_SECTION_HEADER.from_buffer_copy(OutFileBuffer[0:sizeof(EFI_COMMON_SECTION_HEADER)])
+        #InputLength = SectionHeader.Size & 0x00ffffff
+        magic = lambda nums: int(''.join(str(i) for i in nums))
+        InputLength = magic(SectionHeader.Size)
         if InputLength == 0xffffff:
-            SectionHeader = EFI_COMMON_SECTION_HEADER2(SectionHeader)
+            SectionHeader = EFI_COMMON_SECTION_HEADER2.from_buffer_copy(OutFileBuffer[0:sizeof(EFI_COMMON_SECTION_HEADER2)])
             InputLength = SectionHeader.ExtendedSize
             
     #Write the output file
