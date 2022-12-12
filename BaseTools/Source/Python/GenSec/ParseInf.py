@@ -85,8 +85,8 @@ def isdigit(c:int):
     
 
 #Converts a string to an EFI_GUID.
-def StringToGuid(AsciiGuidBuffer:str,GuidBuffer:EFI_GUID) -> int:
-    Data4 = []*8
+def StringToGuid(AsciiGuidBuffer:str,GuidBuffer:EFI_GUID):
+    Data4 = [0]*8
     logger =logging.getLogger('GenSec')
     
     if AsciiGuidBuffer == None or GuidBuffer == None:
@@ -94,7 +94,7 @@ def StringToGuid(AsciiGuidBuffer:str,GuidBuffer:EFI_GUID) -> int:
     
     #Check Guid Format strictly xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx
     Index = 0
-    while AsciiGuidBuffer[Index] != '\0' and Index < 37:
+    while Index < 36:
         if Index == 8 or Index == 13 or Index == 18 or Index == 23:
             if AsciiGuidBuffer[Index] != '-':
                 break
@@ -102,12 +102,14 @@ def StringToGuid(AsciiGuidBuffer:str,GuidBuffer:EFI_GUID) -> int:
             if (AsciiGuidBuffer[Index] >= '0' and AsciiGuidBuffer[Index] <= '9') or\
                 (AsciiGuidBuffer[Index] >= 'a' and AsciiGuidBuffer[Index] <= 'f') or\
                     (AsciiGuidBuffer[Index] >= 'A' and AsciiGuidBuffer[Index] <= 'F'):
+                    Index += 1
                     continue
             else:
                 break
         Index += 1
+        continue
 
-    if Index < 36 or AsciiGuidBuffer[36] != '\0':
+    if Index < 36:
         logger.error("Invalid option value")
         return EFI_ABORTED
 
@@ -147,6 +149,6 @@ def StringToGuid(AsciiGuidBuffer:str,GuidBuffer:EFI_GUID) -> int:
     GuidBuffer.Data4[5]  = Data4[5]
     GuidBuffer.Data4[6]  = Data4[6]
     GuidBuffer.Data4[7]  = Data4[7]
-    
     Status = EFI_SUCCESS
+    
     return Status,GuidBuffer

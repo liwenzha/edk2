@@ -23,7 +23,7 @@ class EFI_COMMON_SECTION_HEADER(Structure):
     def SECTION_SIZE(self) -> int:
         return self.Size[0] | self.Size[1] << 8 | self.Size[2] << 16
     
-    @property
+    #@property
     def SET_SECTION_SIZE(self,size):
         self.Size[0] = size & 0xff
         self.Size[1] = (size & 0xff00) >> 8
@@ -130,7 +130,7 @@ class EFI_GUID_DEFINED_SECTION(Structure):
     _pack_ = 1
     _fields_ = [
         ('CommonHeader', EFI_COMMON_SECTION_HEADER),
-        ('SectionDefinitionGuid',    GUID),
+        ('SectionDefinitionGuid',    EFI_GUID),
         ('DataOffset',               c_uint16),
         ('Attributes',               c_uint16)
     ]

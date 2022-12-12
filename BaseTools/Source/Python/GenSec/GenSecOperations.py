@@ -7,12 +7,13 @@
 from FirmwareStorageFormat.SectionHeader import *
 import logging
 import sys
-import GenCrc32
+import GenCrc32.GenCrc32 as Gen
 import argparse
 from EfiCompress import *
 from PeCoff import *
 from BaseTypes import *
 from ParseInf import *
+import os
 
 
 STATUS_SUCCESS = 0
@@ -62,9 +63,33 @@ mAlignName=["1", "2", "4", "8", "16", "32", "64", "128", "256", "512",
   "1K", "2K", "4K", "8K", "16K", "32K", "64K", "128K", "256K",
   "512K", "1M", "2M", "4M", "8M", "16M"]
 
-mZeroGuid = EFI_GUID(0x0,0x0,0x0,(0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0))
+mZeroGuid = EFI_GUID()
+mZeroGuid.Data1 = 00000000
+mZeroGuid.Data2 = 0000
+mZeroGuid.Data3 = 0000
+mZeroGuid.Data4[0] = 00
+mZeroGuid.Data4[1] = 00
+mZeroGuid.Data4[2] = 00
+mZeroGuid.Data4[3] = 00
+mZeroGuid.Data4[4] = 00
+mZeroGuid.Data4[5] = 00
+mZeroGuid.Data4[6] = 00
+mZeroGuid.Data4[7] = 00
 
-mEfiCrc32SectionGuid = EFI_GUID(0xFC1BCDB0,0x7D31,0x49aa,(0x93, 0x6A, 0xA4, 0x60, 0x0D, 0x9D, 0xD0, 0x83))
+
+mEfiCrc32SectionGuid = EFI_GUID()
+mEfiCrc32SectionGuid.Data1 = 0xFC1BCDB0
+mEfiCrc32SectionGuid.Data2 = 0x7D31
+mEfiCrc32SectionGuid.Data3 = 0x49aa
+mEfiCrc32SectionGuid.Data4[0] = 0x93
+mEfiCrc32SectionGuid.Data4[1] = 0x6A
+mEfiCrc32SectionGuid.Data4[2] = 0xA4
+mEfiCrc32SectionGuid.Data4[3] = 0x60
+mEfiCrc32SectionGuid.Data4[4] = 0x0D
+mEfiCrc32SectionGuid.Data4[5] = 0x9D
+mEfiCrc32SectionGuid.Data4[6] = 0xD0
+mEfiCrc32SectionGuid.Data4[7] =0x83
+
 
 
 #Write ascii string as unicode string format to FILE
@@ -215,7 +240,7 @@ def GetSectionContents(InputFileNum:int,BufferLength:int,InputFileName=[],InputF
             if (InputFileAlign[Index] != 0 and (Size + HeaderSize + TeOffset) % InputFileAlign[Index]) != 0:
                 Offset = (Size + sizeof(EFI_COMMON_SECTION_HEADER)+ HeaderSize + TeOffset + InputFileAlign[Index] - 1) & ~ (InputFileAlign [Index] - 1)
                 Offset = Offset - Size - HeaderSize - TeOffset
-                Offset1 = Offset
+                #Offset1 = Offset
 
                 #The maximal alignment is 64K, the raw section size must be less than 0xffffff
                 if FileBuffer != None and ((Size + Offset) < BufferLength):
@@ -417,10 +442,12 @@ def GenSectionGuidDefinedSection(InputFileNum:int,VendorGuid:EFI_GUID,DataAttrib
         Crc32InputFileContent = FileBuffer
         Crc32Input ='InputFile'
         Crc32Output='OutPutFile'
-        with open(Crc32Input,'rb') as Input:
-            Input.read(Crc32InputFileContent)
-        Crc32Checksum = GenCrc32.CalculateCrc32(Crc32Input,Crc32Output)
-        Crc32Checksum = int.from_bytes(byteorder='little')
+        with open(Crc32Input,'wb') as Input:
+            Input.write(Crc32InputFileContent)
+        Crc32Checksum = Gen.CalculateCrc32(Crc32Input,Crc32Output)
+        Crc32Checksum = int.from_bytes(Crc32Checksum,byteorder='little')
+        os.remove('InputFile')
+        os.remove('OutPutFile')
         
         if TotalLength >= MAX_SECTION_SIZE:
             Crc32GuidSect2 = CRC32_SECTION_HEADER2()
@@ -466,7 +493,7 @@ def GenSectionGuidDefinedSection(InputFileNum:int,VendorGuid:EFI_GUID,DataAttrib
 
     OutFileBuffer = FileBuffer
     Status = EFI_SUCCESS
-    return Status,OutFileBuffer,VendorGuid
+    return Status,OutFileBuffer
 
 
 #Generate a section of type EFI_SECTION_FREEROM_SUBTYPE_GUID
