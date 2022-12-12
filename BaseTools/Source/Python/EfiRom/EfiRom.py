@@ -705,7 +705,7 @@ def main():
             Ext = DEFAULT_OUTPUT_EXTENSION
             
     #Make sure we don't have the same filename for input and output files
-    pass
+    pass #Some file processing,remains to be seen
 
     #Now open our output file
     with open(mOptions.OutFileName,"wb") as FptrOut:
@@ -713,6 +713,16 @@ def main():
         if len(Data) == 0:
             logger.error("Error opening file", "Error opening file %s" %mOptions.OutFileName)
             BailOut
+            
+    #Process all our files
+    TotalSize = 0
+    pass #Some file processing,remains to be seen
+    
+    #Check total size
+    if TotalSize > MAX_OPTION_ROM_SIZE:
+        logger.error("Invalid parameter, Option ROM image size exceeds limit of 0x%x bytes." %MAX_OPTION_ROM_SIZE)
+        Status = STATUS_ERROR
+    
     
 if __name__ == "__main__":
     exit(main())
