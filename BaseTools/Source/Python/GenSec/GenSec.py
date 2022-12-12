@@ -15,6 +15,7 @@ from PeCoff import *
 from BaseTypes import *
 from ParseInf import *
 from GenSecOperations import *
+import copy
 
 
 UTILITY_NAME = 'GenSec'
@@ -67,11 +68,13 @@ def main():
     InputLength = 0
     OutFileBuffer = b''
     StringBuffer = ''
-    VendorGuid = mZeroGuid
+    # VendorGuid = mZeroGuid
+    VendorGuid = copy.deepcopy(mZeroGuid)
     SectType = EFI_SECTION_ALL
     SectGuidAttribute = EFI_GUIDED_SECTION_NONE
     Status = STATUS_SUCCESS
     DummyFileName = ''
+    SectType = None
     
     args = parser.parse_args()
     argc = len(sys.argv)
@@ -354,8 +357,18 @@ def main():
             OutFileBuffer = res[1]
             
     elif SectType == EFI_SECTION_GUID_DEFINED:
-        print(VendorGuid.Data1)
-        print(mZeroGuid.Data1)
+        # print(VendorGuid.Data1)
+        # print(VendorGuid.Data2)
+        # print(VendorGuid.Data3)
+        # print(VendorGuid.Data4[0])
+        # print(VendorGuid.Data4[1])
+        # print(VendorGuid.Data4[2])
+        # print(VendorGuid.Data4[3])
+        # print(VendorGuid.Data4[4])
+        # print(VendorGuid.Data4[5])
+        # print(VendorGuid.Data4[6])
+        # print(VendorGuid.Data4[7])
+        #print(mZeroGuid.Data1)
         res = GenSectionGuidDefinedSection(InputFileNum,VendorGuid,SectGuidAttribute,SectGuidHeaderLength,InputFileName,InputFileAlign,OutFileBuffer)
         if type(res) == 'int':
             Status = res

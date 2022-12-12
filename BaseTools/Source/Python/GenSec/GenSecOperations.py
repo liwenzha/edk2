@@ -386,6 +386,17 @@ def GenSectionGuidDefinedSection(InputFileNum:int,VendorGuid:EFI_GUID,DataAttrib
     
     logger=logging.getLogger('GenSec')
     
+    print(VendorGuid.Data1)
+    print(VendorGuid.Data2)
+    print(VendorGuid.Data3)
+    print(VendorGuid.Data4[0])
+    print(VendorGuid.Data4[1])
+    print(VendorGuid.Data4[2])
+    print(VendorGuid.Data4[3])
+    print(VendorGuid.Data4[4])
+    print(VendorGuid.Data4[5])
+    print(VendorGuid.Data4[6])
+    print(VendorGuid.Data4[7])
     FileBuffer = b''
     InputLength = 0
     Offset = 0
@@ -489,6 +500,18 @@ def GenSectionGuidDefinedSection(InputFileNum:int,VendorGuid:EFI_GUID,DataAttrib
             VendorGuidSect.SectionDefinitionGuid = VendorGuid
             VendorGuidSect.Attributes = DataAttribute
             VendorGuidSect.DataOffset = sizeof (EFI_GUID_DEFINED_SECTION) + DataHeaderSize
+            print('\n')
+            print(type(VendorGuidSect.SectionDefinitionGuid.Data1))
+            print(VendorGuidSect.SectionDefinitionGuid.Data2)
+            print(VendorGuidSect.SectionDefinitionGuid.Data3)
+            print(VendorGuidSect.SectionDefinitionGuid.Data4[0])
+            print(VendorGuidSect.SectionDefinitionGuid.Data4[1])
+            print(VendorGuidSect.SectionDefinitionGuid.Data4[2])
+            print(VendorGuidSect.SectionDefinitionGuid.Data4[3])
+            print(VendorGuidSect.SectionDefinitionGuid.Data4[4])
+            print(VendorGuidSect.SectionDefinitionGuid.Data4[5])
+            print(VendorGuidSect.SectionDefinitionGuid.Data4[6])
+            print(VendorGuidSect.SectionDefinitionGuid.Data4[7])
             FileBuffer = struct2stream(VendorGuidSect) + FileBuffer
 
     OutFileBuffer = FileBuffer
