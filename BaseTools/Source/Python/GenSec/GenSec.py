@@ -74,7 +74,7 @@ def main():
     SectGuidAttribute = EFI_GUIDED_SECTION_NONE
     Status = STATUS_SUCCESS
     DummyFileName = ''
-    SectType = None
+    SectionName = None
     
     args = parser.parse_args()
     argc = len(sys.argv)
@@ -171,7 +171,7 @@ def main():
         
         #Verify string is a integrator number
         for ch in args.Number:
-            if ch != '-' and isdigit(int(ch)) == 0:
+            if ch != '-' and isdigit(ch) == 0:
                 logger.error("Invalid option value")
                 return STATUS_ERROR
         VersionNumber = int(args.Number)
@@ -331,18 +331,18 @@ def main():
     
     #Check whether there is GUID for the SubtypeGuid section
     if SectType == EFI_SECTION_FREEFORM_SUBTYPE_GUID and (CompareGuid (VendorGuid, mZeroGuid) == 0):
-        logger.error("Missing options, GUID")
+        logger.error("Missing options: GUID")
         #return STATUS_ERROR
 
     #Check whether there is input file
     if SectType != EFI_SECTION_VERSION and SectType != EFI_SECTION_USER_INTERFACE:
         #The input file are required for other section type.
         if InputFileNum == 0:
-            logger.error("Missing options, Input files")
+            logger.error("Missing options: Input files")
     
     #Check whether there is output file
     if OutputFileName == None:
-        logger.error("Missing options, Output file") 
+        logger.error("Missing options: Output file") 
         #return STATUS_ERROR
     
     #Finish the command line parsing
@@ -357,25 +357,12 @@ def main():
             OutFileBuffer = res[1]
             
     elif SectType == EFI_SECTION_GUID_DEFINED:
-        # print(VendorGuid.Data1)
-        # print(VendorGuid.Data2)
-        # print(VendorGuid.Data3)
-        # print(VendorGuid.Data4[0])
-        # print(VendorGuid.Data4[1])
-        # print(VendorGuid.Data4[2])
-        # print(VendorGuid.Data4[3])
-        # print(VendorGuid.Data4[4])
-        # print(VendorGuid.Data4[5])
-        # print(VendorGuid.Data4[6])
-        # print(VendorGuid.Data4[7])
-        #print(mZeroGuid.Data1)
         res = GenSectionGuidDefinedSection(InputFileNum,VendorGuid,SectGuidAttribute,SectGuidHeaderLength,InputFileName,InputFileAlign,OutFileBuffer)
         if type(res) == 'int':
             Status = res
         else:
             Status =res[0]
             OutFileBuffer = res[1]
-            # VendorGuid = res[2]
          
     elif SectType == EFI_SECTION_FREEFORM_SUBTYPE_GUID:
         res = GenSectionSubtypeGuidSection(InputFileNum,VendorGuid,InputFileName,InputFileAlign,OutFileBuffer)
@@ -391,12 +378,15 @@ def main():
         Index += 2
         #StringBuffer is ascii.. unicode is 2X + 2 bytes for terminating unicode null.
         Index += len(StringBuffer) * 2 + 2
+        nums = len(StringBuffer)
         VersionSect = EFI_VERSION_SECTION()
-        VersionSect.CommonHeader.Type = SectType
-        VersionSect.CommonHeader.SET_SECTION_SIZE(Index)
-        VersionSect.BuildNumber = VersionNumber
+        # VersionSect.CommonHeader.Type = SectType
+        # VersionSect.CommonHeader.SET_SECTION_SIZE(Index)
+        # VersionSect.BuildNumber = VersionNumber
+        print(int(Ascii2UnicodeString(StringBuffer),16))
+        #VersionSect.VersionString[0] = int(Ascii2UnicodeString(StringBuffer))
+        print(VersionSect.VersionString[0])
         OutFileBuffer = struct2stream(VersionSect)
-        VersionSect.VersionString = Ascii2UnicodeString(StringBuffer,VersionSect.VersionString)
         
     elif SectType == EFI_SECTION_USER_INTERFACE:
         Index = sizeof (EFI_COMMON_SECTION_HEADER)
