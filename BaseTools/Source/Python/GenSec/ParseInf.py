@@ -11,14 +11,22 @@ from BaseTypes import *
 
 #Compares to GUIDs
 def CompareGuid(Guid1:EFI_GUID,Guid2:EFI_GUID):
-    if Guid1 == Guid2:
-        return 0
-    else:
-        return 1
+    r = Guid1.Data1 - Guid2.Data1
+    r += Guid1.Data2 - Guid2.Data2
+    r += Guid1.Data3 - Guid2.Data3
+    r += Guid1.Data4[0] - Guid2.Data4[0]
+    r += Guid1.Data4[1] - Guid2.Data4[1]
+    r += Guid1.Data4[2] - Guid2.Data4[2]
+    r += Guid1.Data4[3] - Guid2.Data4[3]
+    r += Guid1.Data4[4] - Guid2.Data4[4]
+    r += Guid1.Data4[5] - Guid2.Data4[5]
+    r += Guid1.Data4[6] - Guid2.Data4[6]
+    r += Guid1.Data4[4] - Guid2.Data4[7]
+    return r
 
 
 #Determine if an integer represents character that is a hex digit
-def isxdigit(c:int):
+def isxdigit(c:c_char):
     return ('0' <= c and c <= '9') or ('a' <= c and c <= 'f') or ('A' <= c and c <= 'F')
 
 
@@ -50,7 +58,7 @@ def AsciiStringToUint64(AsciiString:str,IsHex:bool,ReturnValue:int):
                 break
             
             #Verify Hex string
-            if isxdigit(int(CurrentChar)) == 0:
+            if isxdigit(CurrentChar) == 0:
                 return EFI_ABORTED
             
             Value *= 16
@@ -80,7 +88,7 @@ def AsciiStringToUint64(AsciiString:str,IsHex:bool,ReturnValue:int):
     return Status,ReturnValue
 
 
-def isdigit(c:int):
+def isdigit(c:c_char):
     return '0' <= c and c <= '9'
     
 
@@ -116,17 +124,17 @@ def StringToGuid(AsciiGuidBuffer:str,GuidBuffer:EFI_GUID):
     #Scan the guid string into the buffer
     Index = 11
     try:
-        Data1 = int(AsciiGuidBuffer[0:8])
-        Data2 = int(AsciiGuidBuffer[9:13])
-        Data3 = int(AsciiGuidBuffer[14:18])
-        Data4[0] = int(AsciiGuidBuffer[19:21])
-        Data4[1] = int(AsciiGuidBuffer[21:23])
-        Data4[2] = int(AsciiGuidBuffer[24:26])
-        Data4[3] = int(AsciiGuidBuffer[26:28])
-        Data4[4] = int(AsciiGuidBuffer[28:30])
-        Data4[5] = int(AsciiGuidBuffer[30:32])
-        Data4[6] = int(AsciiGuidBuffer[32:34])
-        Data4[7] = int(AsciiGuidBuffer[34:36])
+        Data1 = int(AsciiGuidBuffer[0:8],16)
+        Data2 = int(AsciiGuidBuffer[9:13],16)
+        Data3 = int(AsciiGuidBuffer[14:18],16)
+        Data4[0] = int(AsciiGuidBuffer[19:21],16)
+        Data4[1] = int(AsciiGuidBuffer[21:23],16)
+        Data4[2] = int(AsciiGuidBuffer[24:26],16)
+        Data4[3] = int(AsciiGuidBuffer[26:28],16)
+        Data4[4] = int(AsciiGuidBuffer[28:30],16)
+        Data4[5] = int(AsciiGuidBuffer[30:32],16)
+        Data4[6] = int(AsciiGuidBuffer[32:34],16)
+        Data4[7] = int(AsciiGuidBuffer[34:36],16)
     except:
         logger.error("Invalid Data value!")
         Index = 0

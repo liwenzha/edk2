@@ -64,17 +64,17 @@ mAlignName=["1", "2", "4", "8", "16", "32", "64", "128", "256", "512",
   "512K", "1M", "2M", "4M", "8M", "16M"]
 
 mZeroGuid = EFI_GUID()
-mZeroGuid.Data1 = 00000000
-mZeroGuid.Data2 = 0000
-mZeroGuid.Data3 = 0000
-mZeroGuid.Data4[0] = 00
-mZeroGuid.Data4[1] = 00
-mZeroGuid.Data4[2] = 00
-mZeroGuid.Data4[3] = 00
-mZeroGuid.Data4[4] = 00
-mZeroGuid.Data4[5] = 00
-mZeroGuid.Data4[6] = 00
-mZeroGuid.Data4[7] = 00
+mZeroGuid.Data1 = 0x00000000
+mZeroGuid.Data2 = 0x0000
+mZeroGuid.Data3 = 0x0000
+mZeroGuid.Data4[0] = 0x00
+mZeroGuid.Data4[1] = 0x00
+mZeroGuid.Data4[2] = 0x00
+mZeroGuid.Data4[3] = 0x00
+mZeroGuid.Data4[4] = 0x00
+mZeroGuid.Data4[5] = 0x00
+mZeroGuid.Data4[6] = 0x00
+mZeroGuid.Data4[7] = 0x00
 
 
 mEfiCrc32SectionGuid = EFI_GUID()
@@ -93,12 +93,14 @@ mEfiCrc32SectionGuid.Data4[7] =0x83
 
 
 #Write ascii string as unicode string format to FILE
-def Ascii2UnicodeString(String:str,UniString:str) -> None:
-    for ch,ch1 in zip(String,UniString):
-        if ch!='\0':
-            ch1 = ch & 'ffff'
-    ch1 ='\0'
-    return UniString
+def Ascii2UnicodeString(String:str):
+    unistr = ''
+    Enc = String.encode()
+    for ch in Enc:
+        ch = '%02X' % ch
+        unistr += ch
+        #print(ch)
+    return unistr
     
 
 #Generate a leaf section of type other than EFI_SECTION_VERSION
@@ -386,17 +388,6 @@ def GenSectionGuidDefinedSection(InputFileNum:int,VendorGuid:EFI_GUID,DataAttrib
     
     logger=logging.getLogger('GenSec')
     
-    print(VendorGuid.Data1)
-    print(VendorGuid.Data2)
-    print(VendorGuid.Data3)
-    print(VendorGuid.Data4[0])
-    print(VendorGuid.Data4[1])
-    print(VendorGuid.Data4[2])
-    print(VendorGuid.Data4[3])
-    print(VendorGuid.Data4[4])
-    print(VendorGuid.Data4[5])
-    print(VendorGuid.Data4[6])
-    print(VendorGuid.Data4[7])
     FileBuffer = b''
     InputLength = 0
     Offset = 0
@@ -446,7 +437,7 @@ def GenSectionGuidDefinedSection(InputFileNum:int,VendorGuid:EFI_GUID,DataAttrib
     if FileBuffer == None:
         logger.error("Memory cannot be allocated")
         return EFI_OUT_OF_RESOURCES
-    
+
     #Now data is in FileBuffer
     if CompareGuid(VendorGuid, mZeroGuid) == 0:
         #Defalut Guid section is CRC32
@@ -500,18 +491,6 @@ def GenSectionGuidDefinedSection(InputFileNum:int,VendorGuid:EFI_GUID,DataAttrib
             VendorGuidSect.SectionDefinitionGuid = VendorGuid
             VendorGuidSect.Attributes = DataAttribute
             VendorGuidSect.DataOffset = sizeof (EFI_GUID_DEFINED_SECTION) + DataHeaderSize
-            print('\n')
-            print(type(VendorGuidSect.SectionDefinitionGuid.Data1))
-            print(VendorGuidSect.SectionDefinitionGuid.Data2)
-            print(VendorGuidSect.SectionDefinitionGuid.Data3)
-            print(VendorGuidSect.SectionDefinitionGuid.Data4[0])
-            print(VendorGuidSect.SectionDefinitionGuid.Data4[1])
-            print(VendorGuidSect.SectionDefinitionGuid.Data4[2])
-            print(VendorGuidSect.SectionDefinitionGuid.Data4[3])
-            print(VendorGuidSect.SectionDefinitionGuid.Data4[4])
-            print(VendorGuidSect.SectionDefinitionGuid.Data4[5])
-            print(VendorGuidSect.SectionDefinitionGuid.Data4[6])
-            print(VendorGuidSect.SectionDefinitionGuid.Data4[7])
             FileBuffer = struct2stream(VendorGuidSect) + FileBuffer
 
     OutFileBuffer = FileBuffer
@@ -590,7 +569,7 @@ def GenSectionSubtypeGuidSection(InputFileNum:int,SubTypeGuid:EFI_GUID,
         SubtypeGuidSect = EFI_FREEFORM_SUBTYPE_GUID_SECTION()
         SubtypeGuidSect.CommonHeader.Type = EFI_SECTION_FREEFORM_SUBTYPE_GUID
         SubtypeGuidSect.CommonHeader.SET_SECTION_SIZE(TotalLength)
-        SubtypeGuidSect2.SubTypeGuid = SubTypeGuid
+        SubtypeGuidSect.SubTypeGuid = SubTypeGuid
         FileBuffer = struct2stream(SubtypeGuidSect) + FileBuffer
 
     OutFileBuffer = FileBuffer
