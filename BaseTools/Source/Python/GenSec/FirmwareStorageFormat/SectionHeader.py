@@ -401,15 +401,17 @@ class EFI_IMAGE_DEBUG_DIRECTORY_ENTRY(Structure):
         ('FileOffset',c_uint32)
     ]
 
-
-class EFI_VERSION_SECTION(Structure):
-    _pack_ = 1
-    _fields_ = [
-        ('CommonHeader',EFI_COMMON_SECTION_HEADER),
-        ('BuildNumber',c_uint16),
-        ('VersionString',ARRAY(c_uint8,1))
-    ]
-    
+def SET_EFI_VERSION_SECTION(nums):
+    class EFI_VERSION_SECTION(Structure):
+        _pack_ = 1
+        _fields_ = [
+            ('CommonHeader',EFI_COMMON_SECTION_HEADER),
+            ('BuildNumber',c_uint16),
+            ('VersionString',ARRAY(c_uint8,nums))
+        ]
+        def __init__(self,nums):
+            EFI_VERSION_SECTION.CommonHeader = EFI_COMMON_SECTION_HEADER()
+    return EFI_VERSION_SECTION(nums)
 
 class EFI_USER_INTERFACE_SECTION(Structure):
     _pack_ = 1
