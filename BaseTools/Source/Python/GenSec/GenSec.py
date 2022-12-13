@@ -379,14 +379,18 @@ def main():
         #StringBuffer is ascii.. unicode is 2X + 2 bytes for terminating unicode null.
         Index += len(StringBuffer) * 2 + 2
         nums = len(StringBuffer)
-        VersionSect = EFI_VERSION_SECTION()
-        # VersionSect.CommonHeader.Type = SectType
-        # VersionSect.CommonHeader.SET_SECTION_SIZE(Index)
-        # VersionSect.BuildNumber = VersionNumber
-        print(int(Ascii2UnicodeString(StringBuffer),16))
-        #VersionSect.VersionString[0] = int(Ascii2UnicodeString(StringBuffer))
-        print(VersionSect.VersionString[0])
-        OutFileBuffer = struct2stream(VersionSect)
+        VersionSect = SET_EFI_VERSION_SECTION(nums)
+        VersionSect.CommonHeader.Type = SectType
+        VersionSect.CommonHeader.SET_SECTION_SIZE(Index)
+        VersionSect.BuildNumber = VersionNumber
+
+        Enc = StringBuffer.encode()
+        for i in range(nums):
+            ch = Enc[i]
+            VersionSect.VersionString[i] = int(ch)
+            #print(VersionSect.VersionString[i])
+        
+        OutFileBuffer = struct2stream(VersionSect) + b'00'
         
     elif SectType == EFI_SECTION_USER_INTERFACE:
         Index = sizeof (EFI_COMMON_SECTION_HEADER)
