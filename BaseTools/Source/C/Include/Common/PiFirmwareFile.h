@@ -147,7 +147,7 @@ typedef UINT8 EFI_SECTION_TYPE;
 typedef struct {
   UINT8             Size[3];
   EFI_SECTION_TYPE  Type;
-} Size【0EFI_COMMON_SECTION_HEADER;
+} EFI_COMMON_SECTION_HEADER;
 
 typedef struct {
   UINT8             Size[3];

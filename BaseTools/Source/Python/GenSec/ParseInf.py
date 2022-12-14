@@ -36,53 +36,45 @@ def isxdigit(c:c_char):
 #unless the IsHex input is true.
 def AsciiStringToUint64(AsciiString:str,IsHex:bool,ReturnValue:int):
     Value = 0
-    Index = 0
+    #Index = 0
 
     #Check input parameter
     if AsciiString == None or ReturnValue == None or len(AsciiString) > 0xff:
         return EFI_INVALID_PARAMETER
-    while AsciiString[Index] == ' ':
-        Index += 1
+    # while AsciiString[Index] == ' ':
+    #     Index += 1
 
     #Add each character to the result
 
     #Skip first two chars only if the string starts with '0x' or '0X'
-    if AsciiString[Index] == '0' and (AsciiString[Index + 1] == 'x' or AsciiString[Index + 1] == 'X'):
+    if AsciiString[0] == '0' and (AsciiString[1] == 'x' or AsciiString[1] == 'X'):
         IsHex = True
-        Index += 2
+        #Index += 2
     if IsHex:
         #Convert the hex string.
-        while AsciiString[Index] != '\0':
-            CurrentChar = AsciiString[Index]
+        AsciiString = AsciiString[2:]
+        for ch in AsciiString:
+            CurrentChar = ch
             if CurrentChar == ' ':
                 break
             
             #Verify Hex string
-            if isxdigit(CurrentChar) == 0:
+            if isxdigit(ch) == 0:
                 return EFI_ABORTED
-            
-            Value *= 16
-            if CurrentChar >= '0' and CurrentChar <= '9':
-                Value += CurrentChar - '0'
-            elif CurrentChar >= 'a' and CurrentChar <= 'f':
-                Value += CurrentChar - 'a' + 10
-            elif CurrentChar >= 'A' and CurrentChar <= 'F':
-                Value += CurrentChar - 'A' + 10
-            Index += 1
+        
+        Value = int(AsciiString,16)
         ReturnValue = Value
     else:
         #Convert dec string is a number
-        while Index < len (AsciiString):
-            CurrentChar = AsciiString[Index]
+        for ch in AsciiString:
+            CurrentChar = ch
             if CurrentChar == ' ':
                 break
             
             #Verify Dec string
-            if isdigit(int(CurrentChar)) == 0:
+            if isdigit(CurrentChar) == 0:
                 return EFI_ABORTED
-            Value = Value * 10
-            Value += CurrentChar - '0'
-            Index += 1
+        Value = int(AsciiString)
         ReturnValue = Value
     Status = EFI_SUCCESS
     return Status,ReturnValue
