@@ -8,7 +8,7 @@ WNDBIT = 13
 WNDSIZ = 1 << WNDBIT
 THRESHOLD = 3
 UINT8_MAX = 0xff
-MAX_HASH_VAL = 3 * WNDSIZ + (WNDSIZ / 512 + 1) * UINT8_MAX
+MAX_HASH_VAL = 3 * WNDSIZ + (int(WNDSIZ / 512) + 1) * UINT8_MAX
 
 
 MAXMATCH = 256
@@ -39,7 +39,7 @@ mCrc = 0
 mOutputPos = 0
 mOutputMask = 0
 
-mLevel = []
+mLevel = [0]*(WNDSIZ + UINT8_MAX)
 mCLen = []*NC
 mCCode = []*NC
 mTFreq = []*(2 * NT - 1)
@@ -60,15 +60,15 @@ mSortPtr = []
 mSortPtrAdd = 0
 mN = 0
 
-mCFreq = []
-mCrcTable = []
-mPFreq = []
+mCFreq = [0]*(UINT8_MAX + MAXMATCH + 2 - THRESHOLD)
+mCrcTable = [0]*(UINT8_MAX + 1)
+mPFreq = [0]*(2 * NP - 1)
 mPos = 0
 mMatchPos = 0
-mAvail =0
-mPosition = []
-mParent = []
-mNext = []
+mAvail = 0
+mPosition = [0]*(WNDSIZ + UINT8_MAX)
+mParent = [0]*(WNDSIZ*2)
+mNext = [0]*(MAX_HASH_VAL + 1)
 mPrev = []
 mHeapSize = 0
 
@@ -134,7 +134,7 @@ def InitSlide():
         
     mNext[WNDSIZ - 1] = NIL
     
-    for i in range(MAX_HASH_VAL+1):
+    for i in range(WNDSIZ * 2,MAX_HASH_VAL + 1,1):
         mNext[i] = NIL
 
 

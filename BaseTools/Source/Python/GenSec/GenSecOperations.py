@@ -284,7 +284,7 @@ def GenSectionCompressionSection(InputFileNum:int,SectCompSubType:int,InputFileN
     
     logger = logging.getLogger('GenSec')
     
-    #CompressFunction = None
+    CompressFunction = None
     FileBuffer = b''
     OutputBuffer = b''
     InputLength = 0
@@ -492,7 +492,7 @@ def GenSectionGuidDefinedSection(InputFileNum:int,VendorGuid:EFI_GUID,DataAttrib
             VendorGuidSect.Attributes = DataAttribute
             VendorGuidSect.DataOffset = sizeof (EFI_GUID_DEFINED_SECTION) + DataHeaderSize
             FileBuffer = struct2stream(VendorGuidSect) + FileBuffer
-
+    print(DataHeaderSize)
     OutFileBuffer = FileBuffer
     Status = EFI_SUCCESS
     return Status,OutFileBuffer

@@ -75,6 +75,7 @@ def main():
     Status = STATUS_SUCCESS
     DummyFileName = ''
     SectionName = None
+    VersionNumber = 0
     
     args = parser.parse_args()
     argc = len(sys.argv)
@@ -378,29 +379,36 @@ def main():
         Index += 2
         #StringBuffer is ascii.. unicode is 2X + 2 bytes for terminating unicode null.
         Index += len(StringBuffer) * 2 + 2
+        # print(Index)
         nums = len(StringBuffer)
         VersionSect = SET_EFI_VERSION_SECTION(nums)
         VersionSect.CommonHeader.Type = SectType
         VersionSect.CommonHeader.SET_SECTION_SIZE(Index)
+        
         VersionSect.BuildNumber = VersionNumber
 
         Enc = StringBuffer.encode()
         for i in range(nums):
             ch = Enc[i]
-            VersionSect.VersionString[i] = int(ch)
-            #print(VersionSect.VersionString[i])
+            VersionSect.VersionString[i] = ch
         
-        OutFileBuffer = struct2stream(VersionSect) + b'00'
+        OutFileBuffer = struct2stream(VersionSect) + b'\0\0'
         
     elif SectType == EFI_SECTION_USER_INTERFACE:
         Index = sizeof (EFI_COMMON_SECTION_HEADER)
         Index += len (StringBuffer) * 2 + 2
+        nums = len(StringBuffer)
         
-        UiSect = EFI_USER_INTERFACE_SECTION()
-        UiSect.CommonHeader.Type == SectType
+        UiSect = SET_EFI_USER_INTERFACE_SECTION(nums)
+        UiSect.CommonHeader.Type = SectType
         UiSect.CommonHeader.SET_SECTION_SIZE(Index)
-        OutFileBuffer = struct2stream(UiSect)
-        Ascii2UnicodeString (StringBuffer, UiSect.FileNameString)
+        
+        Enc = StringBuffer.encode()
+        for i in range(nums):
+            ch = Enc[i]
+            UiSect.FileNameString[i] = ch
+            
+        OutFileBuffer = struct2stream(UiSect) + b'\0\0'
         
     elif SectType == EFI_SECTION_ALL:
         #Read all input file contents into a buffer

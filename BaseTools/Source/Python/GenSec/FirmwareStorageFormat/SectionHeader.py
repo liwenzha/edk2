@@ -401,24 +401,31 @@ class EFI_IMAGE_DEBUG_DIRECTORY_ENTRY(Structure):
         ('FileOffset',c_uint32)
     ]
 
-def SET_EFI_VERSION_SECTION(nums):
+
+
+def SET_EFI_VERSION_SECTION(nums:int):
     class EFI_VERSION_SECTION(Structure):
         _pack_ = 1
         _fields_ = [
             ('CommonHeader',EFI_COMMON_SECTION_HEADER),
             ('BuildNumber',c_uint16),
-            ('VersionString',ARRAY(c_uint8,nums))
+            ('VersionString',ARRAY(c_uint16,nums))
         ]
         def __init__(self,nums):
-            EFI_VERSION_SECTION.CommonHeader = EFI_COMMON_SECTION_HEADER()
+            self.CommonHeader = EFI_COMMON_SECTION_HEADER()
     return EFI_VERSION_SECTION(nums)
 
-class EFI_USER_INTERFACE_SECTION(Structure):
-    _pack_ = 1
-    _fields_ = [
-        ('CommonHeader',EFI_COMMON_SECTION_HEADER),
-        ('FileNameString',c_uint16)
-    ]
+
+def SET_EFI_USER_INTERFACE_SECTION(nums:int):
+    class EFI_USER_INTERFACE_SECTION(Structure):
+        _pack_ = 1
+        _fields_ = [
+            ('CommonHeader',EFI_COMMON_SECTION_HEADER),
+            ('FileNameString',ARRAY(c_uint16,nums))
+        ]
+        def __init__(self,nums):
+            self.CommonHeader = EFI_COMMON_SECTION_HEADER()
+    return EFI_USER_INTERFACE_SECTION(nums)
 
 
 def Get_USER_INTERFACE_Header(nums: int):
