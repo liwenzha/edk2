@@ -427,53 +427,56 @@ def SetDevicePathEndNode(Node):
 #Duplicates a string
 def UefiDevicePathLibStrDuplicate(Src:str) -> str:
     String = ''
-    String =Src
+    String = Src
     return String
 
 
 #Get one device node from entire device path text
-def GetNextDeviceNodeStr(DevicePath:str,IsInstanceEnd:bool) -> str:
+def GetNextDeviceNodeStr(DevicePath:str,IsInstanceEnd:bool):
     
     Str = DevicePath
 
     if IS_NULL(Str):
         return None
-    
+    length = len(Str)
     #Skip the leading '/','(',')' and ','
-    for ch in Str:
-        if IS_NULL(ch) == 0:
-            if IS_SLASH(ch)== False and IS_SLASH(ch) == False and IS_LEFT_PARENTH (ch) == False and IS_RIGHT_PARENTH (ch) == False:
+    for i in range(length):
+        if IS_NULL(Str[i]) == 0:
+            if IS_SLASH(Str[i])== False and IS_SLASH(Str[i]) == False and IS_LEFT_PARENTH (Str[i]) == False and IS_RIGHT_PARENTH (Str[i]) == False:
                 break
             
-    ReturnStr = Str
-              
+    ReturnStr = Str[i:]
+    
+    length2 = len(ReturnStr)
     #Scan for the separator of this device node, '/' or ','
     ParenthesesStack = 0
-    for ch in Str:
-        if IS_NULL(ch) == False:
-            if (IS_COMMA(ch) or IS_SLASH (ch)) and ParenthesesStack == 0:
+    for i in range(length2):
+        if IS_NULL(Str[i]) == False:
+            if (IS_COMMA(Str[i]) or IS_SLASH (Str[i])) and ParenthesesStack == 0:
                 break
-            if IS_LEFT_PARENTH(ch):
+            if IS_LEFT_PARENTH(Str[i]):
                 ParenthesesStack = ParenthesesStack + 1
-            elif IS_RIGHT_PARENTH(ch):
+            elif IS_RIGHT_PARENTH(Str[i]):
                 ParenthesesStack = ParenthesesStack - 1
     
     if ParenthesesStack != 0:
         #The '(' doesn't pair with ')', invalid device path
         return None
     
-    for ch in Str:
-        if IS_COMMA(ch):
-            IsInstanceEnd = True
-            ch = '\0'
-        else:
-            IsInstanceEnd = False
-            if IS_NULL(ch) == 0:
-                ch = '\0'
+  
+    if IS_COMMA(Str[i]):
+        IsInstanceEnd = True
+        Str[i] = '\0'
+        i += 1
+    else:
+        IsInstanceEnd = False
+        if IS_NULL(Str[i]) == 0:
+            Str[i] = '\0'
+            i += 1
             
-    DevicePath = Str
+    DevicePath = Str[i:]
     
-    return ReturnStr
+    return ReturnStr,DevicePath
 
 
 #Convert text to the binary representation of a device node
@@ -484,7 +487,7 @@ def UefiDevicePathLibConvertTextToDeviceNode(TextDeviceNode:str) -> EFI_DEVICE_P
     ParamStr = ''
     FromText = DEVICE_PATH_FROM_TEXT()
     DeviceNode = EFI_DEVICE_PATH_PROTOCOL()
-    DeviceNodeStr = UefiDevicePathLibStrDuplicate(TextDeviceNode)
+    DeviceNodeStr = TextDeviceNode
     assert(DeviceNodeStr != None)
     Index = 0 
     while mUefiDevicePathLibDevPathFromTextTable[Index].Function != None:
