@@ -9,6 +9,7 @@ import argparse
 from Struct import *
 import sys
 import logging
+import copy
 
 
 STATUS_ERROR = 2
@@ -19,16 +20,16 @@ END_INSTANCE_DEVICE_PATH_SUBTYPE = 0x01
 
 
 parser = argparse.ArgumentParser(description="A Device Path Tool")
-parser.add_argument("--version",dest="version",help="Show program's version number and exit.")
+parser.add_argument("DevicePathString",dest="DevicePath",help="Device Path string is specified, no space character.Example: \"PciRoot(0)/Pci(0,0)")
 parser.add_argument("-h","--help",dest="help",help="Show this help message and exit.")
-parser.add_argument("--version", action="version", version='%(prog)s Version 2.0',
+parser.add_argument("--version", action="version", version='%(prog)s Version 1.0',
                     help="Show program's version number and exit.")
 
 
 def PrintMem(Buffer:EFI_DEVICE_PATH_PROTOCOL,Count:int):
     Bytes = Buffer
     for Idx in range(Count):
-        print("0x" + Bytes[Idx])
+        print("0x%02x" %Bytes[Idx])
         
 
 #Write ascii string as unicode string format to FILE
@@ -45,12 +46,19 @@ def UefiDevicePathLibConvertTextToDevicePath(TextDevicePath:str):
         return None
     
     DevicePath = EFI_DEVICE_PATH_PROTOCOL()
-    SetDevicePathEndNode(DevicePath)
-    DevicePathStr = UefiDevicePathLibStrDuplicate(TextDevicePath)
+    # SetDevicePathEndNode(DevicePath)
+    DevicePathStr = TextDevicePath
+    #DevicePathStr = copy.deepcopy(TextDevicePath)
     
     Str = DevicePathStr
     IsInstanceEnd = False
-    DeviceNodeStr = GetNextDeviceNodeStr (Str,IsInstanceEnd)
+    res = GetNextDeviceNodeStr (Str,IsInstanceEnd)
+    if res == None:
+        DeviceNodeStr = None
+    else:
+        DeviceNodeStr = res[0]
+        Str = res[1]
+
     while DeviceNodeStr != None:
         DeviceNode = UefiDevicePathLibConvertTextToDeviceNode (DeviceNodeStr)
         NewDevicePath = EFI_DEVICE_PATH_PROTOCOL()
@@ -79,9 +87,7 @@ def main():
         logger.error("Missing options", "No input options specified.")
         parser.print_help()
         return STATUS_ERROR
-    
-    # if args.help:
-    #     pass
+
     
     # if args.version:
     #     pass
@@ -90,9 +96,9 @@ def main():
     if Str == None:
         logger.error("Invalid option value, Device Path can't be NULL")
         return STATUS_ERROR
-    Str16 = ''
-    Ascii2UnicodeString(Str,Str16)
-    DevicePath = UefiDevicePathLibConvertTextToDevicePath(Str16)
+    #Str16 = ''
+    #Ascii2UnicodeString(Str,Str16)
+    DevicePath = UefiDevicePathLibConvertTextToDevicePath(Str)
     if DevicePath == None:
         logger.error("Convert fail, Cannot convert text to a device path")
         return STATUS_ERROR
