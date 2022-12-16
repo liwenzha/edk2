@@ -20,6 +20,7 @@ MAX_DEVICE_PATH_NODE_COUNT = 1024
 
 HARDWARE_DEVICE_PATH = 0x01
 SIZE_64KB = 0x00010000
+HW_PCI_DP = 0x01
 
 
 class EFI_DEVICE_PATH_PROTOCOL(Structure):
@@ -41,7 +42,16 @@ class DEVICE_PATH_FROM_TEXT_TABLE(Structure):
         ('DevicePathNodeText',c_char),
         ('Function',DEVICE_PATH_FROM_TEXT)
     ]
+    
 
+class PCI_DEVICE_PATH(Structure):
+    _pack_ = 1
+    _fields_ =[
+        ('Header',EFI_DEVICE_PATH_PROTOCOL),
+        ('Function',c_uint8),
+        ('Device',c_uint8)
+    ]
+    
 
 def SplitStr(List:str,Separator:str):
     Str = List
@@ -120,10 +130,15 @@ def CreateDeviceNode(NodeType:c_uint8,NodeSubType:c_int8,NodeLength:c_uint16) ->
 def DevPathFromTextPci(TextDeviceNode:str):
     DeviceStr   = GetNextParamStr (TextDeviceNode)
     FunctionStr = GetNextParamStr (TextDeviceNode)
-    Pci = 
+    Pci = PCI_DEVICE_PATH().from_buffer_copy(CreateDeviceNode(HARDWARE_DEVICE_PATH,HW_PCI_DP,sizeof (PCI_DEVICE_PATH)))
+    Pci.Function = int(FunctionStr)
+    Pci.Device = int(DeviceStr)
     
     
-    
+def DevPathFromTextPcCard(TextDeviceNode):
+    Pccard = PCCARD_DEVICE_PATH()
+    FunctionNumberStr = GetNextParamStr(TextDeviceNode)
+    Pccard = PCCARD_DEVICE_PATH().from_buffer_copy(CreateDeviceNode(HARDWARE_DEVICE_PATH,HW_PCCARD_DP,sizeof (PCCARD_DEVICE_PATH)))
     
 
 mUefiDevicePathLibDevPathFromTextTable = DEVICE_PATH_FROM_TEXT_TABLE{
