@@ -24,7 +24,7 @@ UTILITY_MINOR_VERSION = 1
 
 
 parser=argparse.ArgumentParser(description="Create Firmware File Section files  per PI Spec")
-parser.add_argument("-i",dest = "input",help = "Input file name")
+parser.add_argument("input",help = "Input file name")
 parser.add_argument("-o","--outputfile",dest="output",help="File is the SectionFile to be created.")
 parser.add_argument("-s","--sectiontype",dest="SectionType",help="SectionType defined in PI spec is one type of\
                     EFI_SECTION_COMPRESSION, EFI_SECTION_GUID_DEFINED,EFI_SECTION_PE32, \
