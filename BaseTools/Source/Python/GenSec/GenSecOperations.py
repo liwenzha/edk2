@@ -339,13 +339,20 @@ def GenSectionCompressionSection(InputFileNum:int,SectCompSubType:int,InputFileN
         else:
             Status = res[0]
             OutputBuffer = res[1]
+            CompressedLength = res[2]
             
         if Status == EFI_BUFFER_TOO_SMALL:
             HeaderLength = sizeof(EFI_COMPRESSION_SECTION)
             if CompressedLength + HeaderLength >= MAX_SECTION_SIZE:
                 HeaderLength = sizeof(EFI_COMPRESSION_SECTION2)
             TotalLength = CompressedLength + HeaderLength
-            Status = CompressFunction (FileBuffer, InputLength, OutputBuffer, CompressedLength)
+            res = CompressFunction(InputLength,CompressedLength,FileBuffer,OutputBuffer)
+            if type(res) == 'int':
+                Status = res
+            else:
+                Status = res[0]
+                OutputBuffer = res[1]
+                CompressedLength = res[2]
             
         FileBuffer = OutputBuffer
             
