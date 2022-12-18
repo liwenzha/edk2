@@ -46,7 +46,7 @@ class FILE_LIST(Structure):
         
     __pack__ = 1
     __fields__ =[
-        ('Next',FILE_LIST),
+        #('Next',FILE_LIST),
         ('FileName',c_char),
         ('FileFlags',c_uint32),
         ('ClassCode',c_uint32),
