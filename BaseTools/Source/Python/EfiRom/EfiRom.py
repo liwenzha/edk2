@@ -46,13 +46,13 @@ logger=logging.getLogger('EfiRom')
 
 
 #Process a binary input file
-def ProcessBinFile(OutFptr,Size:int,InFile:FILE_LIST):
+def ProcessBinFile(OutFptr,InFile:FILE_LIST,Size:int) -> int:
     
     Status = STATUS_SUCCESS
     #Try to open the input file
     with open(InFile.FileName,"rb") as InFptr:
         if InFptr == None:
-            logger.error("Error opening file : %s", InFile.FileName)
+            logger.error("Error opening file : %s" %InFile.FileName)
             return STATUS_ERROR
         Data = InFptr.read()
         FileSize = len(Data)
@@ -100,10 +100,10 @@ def ProcessBinFile(OutFptr,Size:int,InFile:FILE_LIST):
     
     #ReSet Option Rom size
     if mOptions.Pci23 == 1:
-        PciDs23.ImageLength = TotalSize / 512
+        PciDs23.ImageLength = c_uint16(TotalSize / 512)
         CodeType = PciDs23.CodeType
     else:
-        PciDs23.ImageLength = TotalSize / 512
+        PciDs23.ImageLength = c_uint16(TotalSize / 512)
         CodeType = PciDs30.CodeType
         
     #If this is the last image, then set the LAST bit unless requested not
@@ -124,7 +124,8 @@ def ProcessBinFile(OutFptr,Size:int,InFile:FILE_LIST):
         for Index in range(FileSize - 1):
             ByteCheckSum = ByteCheckSum + Buffer[Index]
         Temp = ~ByteCheckSum + 1
-        Buffer = Buffer.replace(Buffer[FileSize - 1] , Temp.to_bytes(1,byteorder= 'little'))
+        #Buffer = Buffer.replace(Buffer[FileSize - 1] , Temp.to_bytes(1,byteorder= 'little'))
+        Buffer = Buffer.replace(Buffer[FileSize - 1: FileSize] , Temp.to_bytes(1,byteorder= 'little'))
         
     #Now copy the input file contents out to the output file
     OutFptr.write(Buffer)
@@ -155,7 +156,7 @@ def ProcessEfiFile(OutFptr,InFile:FILE_LIST,VendId:c_uint16,DevId:c_uint16,Size:
     #Try to open the input file
     with open(InFile.FileName,"rb") as InFptr:
         if InFptr == None:
-            logger.error("Error opening file : %s", InFile.FileName)
+            logger.error("Error opening file : %s" %InFile.FileName)
             return STATUS_ERROR
         
         #Double-check the file to make sure it's what we expect it to be.
@@ -166,13 +167,13 @@ def ProcessEfiFile(OutFptr,InFile:FILE_LIST,VendId:c_uint16,DevId:c_uint16,Size:
             Status = res[0]
             MachineType = res[1]
             SubSystem = res[2]
+        
         if Status != STATUS_SUCCESS:
-            logger.error("Error parsing", "Error parsing file: %s", InFile.FileName)
+            logger.error("Error parsing, Error parsing file: %s" %InFile.FileName)
             return Status
         #Seek to the end of the input file and get the file size
         Data = InFptr.read()
         FileSize = len(Data)
-    
     
     #Get the size of the headers we're going to put in front of the image. The
     #EFI header must be aligned on a 4-byte boundary, so pad accordingly.
@@ -194,7 +195,11 @@ def ProcessEfiFile(OutFptr,InFile:FILE_LIST,VendId:c_uint16,DevId:c_uint16,Size:
         HeaderSize = sizeof (PCI_3_0_DATA_STRUCTURE) + HeaderPadBytes + DevIdListSize + sizeof (EFI_PCI_EXPANSION_ROM_HEADER)
     
     Buffer = Data
+    if len(Buffer) == 0:
+        logger.error( "Error reading file, File %s" %InFile.FileName)
+    
     if InFile.FileFlags & FILE_FLAG_COMPRESS != 0:
+        CompressedBuffer = b''
         CompressedFileSize = FileSize
         res = EfiCompress(FileSize, CompressedFileSize,Buffer,CompressedBuffer)
         if type(res) == 'int':
@@ -202,6 +207,7 @@ def ProcessEfiFile(OutFptr,InFile:FILE_LIST,VendId:c_uint16,DevId:c_uint16,Size:
         else:
             Status = res[0]
             CompressedBuffer = res[1]
+            CompressedFileSize =res[2]
             
         if Status != STATUS_SUCCESS:
             logger.error("Error compressing file!")
@@ -231,7 +237,7 @@ def ProcessEfiFile(OutFptr,InFile:FILE_LIST,VendId:c_uint16,DevId:c_uint16,Size:
         
     #Check size
     if TotalSize > MAX_OPTION_ROM_SIZE:
-        logger.error("Invalid, Option ROM image %s size exceeds limit of 0x%X bytes.",InFile.FileName, MAX_OPTION_ROM_SIZE)
+        logger.error("Invalid, Option ROM image %s size exceeds limit of 0x%x bytes." %InFile.FileName %MAX_OPTION_ROM_SIZE)
         Status = STATUS_ERROR
         return Status
     
@@ -241,7 +247,7 @@ def ProcessEfiFile(OutFptr,InFile:FILE_LIST,VendId:c_uint16,DevId:c_uint16,Size:
     #Now fill in the ROM header. These values come from chapter 18 of the
     #EFI 1.02 specification.
     RomHdr.Signature            = PCI_EXPANSION_ROM_HEADER_SIGNATURE
-    RomHdr.InitializationSize   = TotalSize / 512
+    RomHdr.InitializationSize   = c_uint16(TotalSize / 512)
     RomHdr.EfiSignature         = EFI_PCI_EXPANSION_ROM_HEADER_EFISIGNATURE
     RomHdr.EfiSubsystem         = SubSystem
     RomHdr.EfiMachineType       = MachineType
@@ -291,7 +297,7 @@ def ProcessEfiFile(OutFptr,InFile:FILE_LIST,VendId:c_uint16,DevId:c_uint16,Size:
         
     #If this is the last image, then set the LAST bit unless requested not
     #to via the command-line -n argument.
-    if InFile.Nex == None and mOptions.NoLast == 0:
+    if InFile.Next == None and mOptions.NoLast == 0:
         if mOptions.Pci23 == 1:
             PciDs23.Indicator = INDICATOR_LAST
         else:
@@ -334,7 +340,7 @@ def ProcessEfiFile(OutFptr,InFile:FILE_LIST,VendId:c_uint16,DevId:c_uint16,Size:
     
     #Write the Device ID list to the output file
     if mOptions.DevIdCount > 1:
-        OutFptr.write(mOptions.DevIdCount.to_bytes(2,byteorder='little'))
+        OutFptr.write(mOptions.DevIdList.to_bytes(2,byteorder='little'))
         if len(mOptions.DevIdCount.to_bytes(2,byteorder='little')) == 0:
             logger.error("Failed to write PCI ROM header to output file!")
             Status = STATUS_ERROR
@@ -378,8 +384,7 @@ def ProcessEfiFile(OutFptr,InFile:FILE_LIST,VendId:c_uint16,DevId:c_uint16,Size:
 
 #Given a file pointer to a supposed PE32 image file, verify that it is indeed a
 #PE32 image file, and then return the machine type in the supplied pointer.
-
-def CheckPE32File(Fptr,MachineType,SubSystem):
+def CheckPE32File(Fptr,MachineType:c_uint16,SubSystem:c_uint16):
     
     #Read the DOS header
     Data = Fptr.read()
@@ -403,6 +408,11 @@ def CheckPE32File(Fptr,MachineType,SubSystem):
         return Status
     
     #Check the PE signature in the header "PE\0\0"
+    if PeHdr.Pe32.Signature != EFI_IMAGE_NT_SIGNATURE:
+        logger.error("Invalid parameter, Input file does not appear to be a PE32 image (signature)!")
+        Status = STATUS_ERROR
+        return Status
+
     if PeHdr.Pe32.OptionalHeader.Magic == EFI_IMAGE_NT_OPTIONAL_HDR32_MAGIC:
         SubSystem = PeHdr.Pe32.OptionalHeader.Subsystem
     elif PeHdr.Pe32Plus.OptionalHeader.Magic == EFI_IMAGE_NT_OPTIONAL_HDR64_MAGIC:
@@ -466,7 +476,7 @@ def ParseCommandLine(Options:OPTIONS):
 
 
 #GC_TODO: Add function description
-def GetMachineTypeStr(MachineType) -> str:
+def GetMachineTypeStr(MachineType:str) -> str:
     Index = 0
     while mMachineTypes[Index].Name != None:
         if mMachineTypes[Index].Value == MachineType:
@@ -514,10 +524,10 @@ def DumpImage(InFile:FILE_LIST):
             InFptr.close()
             
         #Dump the contents of the header
-        print("Image %u -- Offset 0x%X\n", ImageCount, ImageStart)
+        print("Image %u -- Offset 0x%x\n" %ImageCount, ImageStart)
         print("ROM header contents\n")
-        print("    Signature              0x%04X\n", PciRomHdr.Signature)
-        print("    PCIR offset            0x%04X\n", PciRomHdr.PcirOffset)
+        print("    Signature              0x%04x\n" %PciRomHdr.Signature)
+        print("    PCIR offset            0x%04x\n" %PciRomHdr.PcirOffset)
         
         #Find PCI data structure
         if InFptr.seek(ImageStart + PciRomHdr.PcirOffset,os.SEEK_SET) == -1:
@@ -526,17 +536,18 @@ def DumpImage(InFile:FILE_LIST):
             
         #Read and dump the PCI data structure
         if mOptions.Pci23 == 1:
-            PciDs23 = PCI_DATA_STRUCTURE.from_buffer_copy(Data)
+            PciDs23 = PCI_DATA_STRUCTURE.from_buffer_copy(InFptr.read())
             if sizeof(PciDs23) == 0:
                 logger.error("Not supported, Failed to read PCI data from file {}!".format(InFile.FileName))
                 InFptr.close()
         else:
-            PciDs30 = PCI_DATA_STRUCTURE.from_buffer_copy(Data)
+            PciDs30 = PCI_DATA_STRUCTURE.from_buffer_copy(InFptr.read())
             if sizeof(PciDs30) == 0:
                 logger.error("Not supported, Failed to read PCI data from file {}!".format(InFile.FileName))
                 InFptr.close()
+
         if mOptions.Pci23 == 1:
-            print("    Signature              {}{}{}{}".format(
+            print("    Signature              {%c}{%c}{%c}{%c}".format(
                   PciDs23.Signature,
                   PciDs23.Signature >> 8,
                   PciDs23.Signature >> 16,
@@ -550,7 +561,7 @@ def DumpImage(InFile:FILE_LIST):
             print("    Code revision:         0x{:0>4}\n".format(PciDs23.CodeRevision))
             print("    Indicator              0x{:0>2}".format(PciDs23.Indicator))
         else:
-            print("    Signature              {}{}{}{}".format(
+            print("    Signature              {%c}{%c}{%c}{%c}".format(
                   PciDs30.Signature,
                   PciDs30.Signature >> 8,
                   PciDs30.Signature >> 16,
@@ -568,19 +579,22 @@ def DumpImage(InFile:FILE_LIST):
                     InFptr.close()
                     
                 #Loop until terminating 0
-                DevId = int.from_bytes(Data[0:sizeof(c_uint16)],byteorder='little',signed=False)
+                
+                DevId = int.from_bytes(Data[ImageStart + PciRomHdr.PcirOffset + PciDs30.DeviceListOffset : ImageStart + PciRomHdr.PcirOffset + PciDs30.DeviceListOffset + c_uint16],byteorder='little',signed=False)
                 if sizeof(DevId) == 0:
                     logger.error("Not supported, Failed to PCI device ID list from file {}".format(InFile.FileName))
                     InFptr.close()
                 if DevId:
                     print("      0x{:0>4}\n".format(DevId))
+                i = 0 
                 while(DevId):
-                    DevId = int.from_bytes(Data[0:sizeof(c_uint16)],byteorder='little',signed=False)
+                    DevId = int.from_bytes(Data[ImageStart + PciRomHdr.PcirOffset + PciDs30.DeviceListOffset + i : ImageStart + PciRomHdr.PcirOffset + PciDs30.DeviceListOffset + c_uint16] + i,byteorder='little',signed=False)
                     if sizeof(DevId) == 0:
                         logger.error("Not supported, Failed to PCI device ID list from file {}".format(InFile.FileName))
                         InFptr.close()
                     if DevId:
                         print("      0x{:0>4}\n".format(DevId))
+                        i += 2
             print("    Image size              0x{}\n".format(PciDs30.ImageLength * 512))   
             print("    Code revision:          0x{:0>4}\n".format(PciDs30.CodeRevision))   
             print("    MaxRuntimeImageLength   0x{:0>2}\n".format(PciDs30.MaxRuntimeImageLength))   
@@ -607,7 +621,7 @@ def DumpImage(InFile:FILE_LIST):
                 logger.error("Failed to re-seek to ROM header structure!")
                 InFptr.close()
                 
-            EfiRomHdr = EFI_PCI_EXPANSION_ROM_HEADER.from_buffer_copy(Data)
+            EfiRomHdr = EFI_PCI_EXPANSION_ROM_HEADER.from_buffer_copy(InFptr.read())
             if len(EfiRomHdr) == 0:
                 logger.error("Failed to read EFI PCI ROM header from file!")
                 InFptr.close()
@@ -631,15 +645,17 @@ def DumpImage(InFile:FILE_LIST):
         #if (PciDs.CodeType == PCI_CODE_TYPE_EFI_IMAGE) {
         #   }
         #If last image, then we're done
-        
+        if PciDs23.Indicator == INDICATOR_LAST or PciDs30.Indicator == INDICATOR_LAST:
+            InFptr.close()
+
         if mOptions.Pci23 == 1:
             if InFptr.seek( ImageStart + (PciDs23.ImageLength * 512), os.SEEK_SET) == -1:
                 logger.error("Not supported, Failed to seek to next image!")
                 InFptr.close()
-            else:
-                if InFptr.seek(ImageStart + (PciDs30.ImageLength * 512), os.SEEK_SET) == -1:
-                    logger.error("Not supported, Failed to seek to next image!")
-                    InFptr.close()
+        else:
+            if InFptr.seek(ImageStart + (PciDs30.ImageLength * 512), os.SEEK_SET) == -1:
+                logger.error("Not supported, Failed to seek to next image!")
+                InFptr.close()
             
                     
 
