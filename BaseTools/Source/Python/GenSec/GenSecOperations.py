@@ -330,7 +330,7 @@ def GenSectionCompressionSection(InputFileNum:int,SectCompSubType:int,InputFileN
     else:
         logger.error("Invalid parameter, unknown compression type")
         return EFI_ABORTED
-    
+    # print(len(FileBuffer))
     #Actual compressing 
     if CompressFunction != None:
         res = CompressFunction(InputLength,CompressedLength,FileBuffer,OutputBuffer)
@@ -340,6 +340,7 @@ def GenSectionCompressionSection(InputFileNum:int,SectCompSubType:int,InputFileN
             Status = res[0]
             OutputBuffer = res[1]
             CompressedLength = res[2]
+            print(res)
             
         if Status == EFI_BUFFER_TOO_SMALL:
             HeaderLength = sizeof(EFI_COMPRESSION_SECTION)
@@ -353,6 +354,7 @@ def GenSectionCompressionSection(InputFileNum:int,SectCompSubType:int,InputFileN
                 Status = res[0]
                 OutputBuffer = res[1]
                 CompressedLength = res[2]
+                print(res)
             
         FileBuffer = OutputBuffer
             
@@ -380,7 +382,7 @@ def GenSectionCompressionSection(InputFileNum:int,SectCompSubType:int,InputFileN
         CompressionSect.CompressionType = SectCompSubType
         CompressionSect.UncompressedLength = InputLength
         FileBuffer = struct2stream(CompressionSect) + FileBuffer
-    
+
     OutFileBuffer = FileBuffer
     Status = EFI_SUCCESS
     return Status,OutFileBuffer
@@ -499,7 +501,7 @@ def GenSectionGuidDefinedSection(InputFileNum:int,VendorGuid:EFI_GUID,DataAttrib
             VendorGuidSect.Attributes = DataAttribute
             VendorGuidSect.DataOffset = sizeof (EFI_GUID_DEFINED_SECTION) + DataHeaderSize
             FileBuffer = struct2stream(VendorGuidSect) + FileBuffer
-    print(DataHeaderSize)
+    # print(DataHeaderSize)
     OutFileBuffer = FileBuffer
     Status = EFI_SUCCESS
     return Status,OutFileBuffer
