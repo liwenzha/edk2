@@ -92,19 +92,19 @@ def EFI_ERROR(A):
 def PutDword(Data:int):
     global mDst, mDstAdd
     if mDstAdd < mDstUpperLimit:
-        mDst = mDst + bytes(Data & 0xff)
+        mDst = mDst + Data.to_bytes(1,byteorder='little')
         mDstAdd += 1
         
     if mDstAdd < mDstUpperLimit:
-        mDst = mDst + bytes(Data >> 0x08 & 0xff)
+        mDst = mDst + Data.to_bytes(1,byteorder='little')
         mDstAdd += 1
         
     if mDstAdd < mDstUpperLimit:
-        mDst = mDst + bytes(Data >> 0x10 & 0xff)
+        mDst = mDst + Data.to_bytes(1,byteorder='little')
         mDstAdd += 1
         
     if mDstAdd < mDstUpperLimit:
-        mDst = mDst + bytes(Data >> 0x18 & 0xff)
+        mDst = mDst + Data.to_bytes(1,byteorder='little')
         mDstAdd += 1
 
 
@@ -135,7 +135,6 @@ def InitSlide():
         mNext[i]  = i + 1
         
     mNext[WNDSIZ - 1] = NIL
-    
     for i in range(WNDSIZ * 2,MAX_HASH_VAL + 1,1):
         mNext[i] = NIL
 
@@ -148,13 +147,13 @@ def InitPutBits():
 
 
 def HufEncodeStart():
+    global mOutputPos,mOutputMask
     for i in range(NC):
         mCFreq[i] = 0
     
     for i in range(NP):
         mPFreq[i] = 0
         
-    global mOutputPos,mOutputMask
     mOutputPos = mOutputMask = 0
     InitPutBits()
     return
@@ -235,10 +234,11 @@ def PutBits(n:c_uint32,x:c_uint32):
         mSubBitBuf |= x << mBitCount
     else:
         n -= mBitCount
-        Temp = mSubBitBuf | x >> n
+        Temp = int(mSubBitBuf | x >> n)
 
         if mDstAdd < mDstUpperLimit:
-            mDst = mDst + bytes(Temp)
+            mDst = Temp.to_bytes(4,byteorder ='little')
+            #mDst = mDst.replace(mDst[mDstAdd:mDstAdd+1],Temp.to_bytes(1,byteorder ='little'))
             mDstAdd += 1
         
         mCompSize += 1
@@ -246,10 +246,11 @@ def PutBits(n:c_uint32,x:c_uint32):
             mBitCount = UINT8_BIT - n
             mSubBitBuf = x << mBitCount
         else:
-            Temp = (x >> (n - UINT8_BIT))
+            Temp = int(x >> (n - UINT8_BIT))
 
             if mDstAdd < mDstUpperLimit:
-                mDst = mDst + bytes(Temp)
+                mDst += Temp.to_bytes(4,byteorder ='little')
+                #mDst = mDst.replace(mDst[mDstAdd:mDstAdd+1],Temp.to_bytes(1,byteorder ='little'))
                 mDstAdd += 1
 
             mCompSize += 1
@@ -487,7 +488,7 @@ def MakeTree(NParm:c_int32,FreqParm = [],LenParm= [],CodeParm = []):
 
 #Huffman code the block and output it
 def SendBlock():
-    global mCFreq
+    #global mCFreq
     Root = MakeTree(NC, mCFreq, mCLen, mCCode)
     Size = mCFreq[Root]
     PutBits(16, Size)
@@ -603,6 +604,7 @@ def InsertNode():
             mMatchLen = 1
             return
         mMatchLen = 2
+
     #Traverse down the tree to find a match.
     #Update Position value along the route.
     #Node split or creation is involved.
@@ -618,7 +620,6 @@ def InsertNode():
             
         index1= mPos + mMatchLen
         index2 = mMatchPos + mMatchLen
-        
         while mMatchLen < j:
             if mText[index1] != mText[index2]:
                 Split(r)
@@ -713,16 +714,16 @@ def GetNextMatch():
         while mSrcAdd < mSrcUpperLimit and i < n:
             Index = WNDSIZ + MAXMATCH
             mText = mText.replace(mText[Index:Index+1],mSrc[mSrcAdd:mSrcAdd+1])
-            i += 1
             mSrcAdd += 1
             Index += 1
+            i += 1
         n = i
-        #p -= n
         mOrigSize += n
         while i - 1 >= 0:
             Index = WNDSIZ + MAXMATCH
             UPDATE_CRC(mText[Index])
             Index += 1
+            i -= 1
         
         mRemainder += n
         mPos = WNDSIZ
@@ -739,8 +740,6 @@ def HufEncodeEnd():
 
 #The main controlling routine for compression process.
 def Encode() -> int:
-    # for i in range(WNDSIZ):
-    #     mText + b'0'
     
     global mBufSiz,mBuf,mRemainder,mMatchLen,mPos,mSrcAdd,mText,mOrigSize
     # mBufSiz = 16 * 1024
@@ -755,8 +754,8 @@ def Encode() -> int:
         Index = WNDSIZ
         mText = mText.replace(mText[Index:Index+1],mSrc[mSrcAdd:mSrcAdd+1])
         mSrcAdd += 1
-        i += 1
         Index += 1
+        i += 1
     n = i
     mOrigSize += n
     while i - 1 >= 0:
@@ -785,6 +784,7 @@ def Encode() -> int:
             Output(LastMatchLen + UINT8_MAX + 1 - THRESHOLD,(mPos - LastMatchPos - 2) & (WNDSIZ - 1))
             while LastMatchLen - 1 > 0:
                 GetNextMatch()
+                LastMatchLen -= 1
             if mMatchLen > mRemainder:
                 mMatchLen = mRemainder
     
@@ -799,12 +799,10 @@ def EfiCompress(SrcSize:int,DstSize:int,SrcBuffer = b'',DstBuffer = b''):
     Status = EFI_SUCCESS
     
     mSrc = SrcBuffer
-    #mSrcAdd = 0
     mSrcUpperLimit = mSrcAdd + SrcSize
     mDst = DstBuffer
-    #mDstAdd = 0
     mDstUpperLimit = mDstAdd + DstSize
-    
+
     PutDword(0)
     PutDword(0)
     
@@ -818,17 +816,18 @@ def EfiCompress(SrcSize:int,DstSize:int,SrcBuffer = b'',DstBuffer = b''):
     if EFI_ERROR (Status):
         return EFI_OUT_OF_RESOURCES
     
-
-    
     #Null terminate the compressed data
     if mDstAdd < mDstUpperLimit:
         mDst += b'0'
-        #mDstAdd += 1
+        mDstAdd += 1
+    # print(len(mDst))
+
     
     #Fill in compressed size and original size
     mDst = DstBuffer
     PutDword(mCompSize+1)
     PutDword(mOrigSize)
+    # print(len(mDst))
     
     #Return
     if mCompSize + 1 + 8 > DstSize:
