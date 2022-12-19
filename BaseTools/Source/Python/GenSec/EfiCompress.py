@@ -89,7 +89,7 @@ def EFI_ERROR(A):
 
 
 #Put a dword to output stream
-def PutDword(Data:int):
+def PutDword(Data:c_uint32):
     global mDst, mDstAdd
     if mDstAdd < mDstUpperLimit:
         mDst = mDst + Data.to_bytes(1,byteorder='little')

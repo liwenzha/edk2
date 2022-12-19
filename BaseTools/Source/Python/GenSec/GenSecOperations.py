@@ -108,7 +108,7 @@ def Ascii2UnicodeString(String:str):
 #The function won't validate the input file's contents. For
 #common leaf sections, the input file may be a binary file.
 #The utility will add section header to the file.
-def GenSectionCommonLeafSection(SectionType:int,InputFileNum:int,InputFileName=[],OutFileBuffer = b''):
+def GenSectionCommonLeafSection(SectionType:c_uint8,InputFileNum:c_uint32,InputFileName=[],OutFileBuffer = b''):
     
     logger=logging.getLogger('GenSec')
 
@@ -152,7 +152,7 @@ def GenSectionCommonLeafSection(SectionType:int,InputFileNum:int,InputFileName=[
 
 
 #Converts Align String to align value (1~16M).
-def StringtoAlignment(AlignBuffer:str, AlignNumber:int) -> int:
+def StringtoAlignment(AlignBuffer:str, AlignNumber:c_uint32) -> int:
 
     #Check AlignBuffer
     if AlignBuffer == None:
@@ -166,7 +166,7 @@ def StringtoAlignment(AlignBuffer:str, AlignNumber:int) -> int:
     return EFI_INVALID_PARAMETER
 
 #Get the contents of all section files specified in InputFileName into FileBuffer
-def GetSectionContents(InputFileNum:int,BufferLength:int,InputFileName=[],InputFileAlign=[],
+def GetSectionContents(InputFileNum:c_uint32,BufferLength:c_uint32,InputFileName=[],InputFileAlign=[],
                         FileBuffer=b'',):
     
     logger=logging.getLogger('GenSec')
@@ -278,7 +278,7 @@ def GetSectionContents(InputFileNum:int,BufferLength:int,InputFileName=[],InputF
 #Input file must be already sectioned. The function won't validate
 #the input files' contents. Caller should hand in files already
 #with section header.
-def GenSectionCompressionSection(InputFileNum:int,SectCompSubType:int,InputFileName=[],InputFileAlign=[],OutFileBuffer = b''):    
+def GenSectionCompressionSection(InputFileNum:c_uint32,SectCompSubType:c_uint8,InputFileName=[],InputFileAlign=[],OutFileBuffer = b''):    
     #Read all input file contenes into a buffer 
     #first get the size of all contents
     
@@ -392,8 +392,8 @@ def GenSectionCompressionSection(InputFileNum:int,SectCompSubType:int,InputFileN
 #Input file must be already sectioned. The function won't validate
 #the input files' contents. Caller should hand in files already
 #with section header.
-def GenSectionGuidDefinedSection(InputFileNum:int,VendorGuid:EFI_GUID,DataAttribute:int,
-                                 DataHeaderSize:int,InputFileName=[],InputFileAlign=[],OutFileBuffer=b'') -> int:
+def GenSectionGuidDefinedSection(InputFileNum:c_uint32,VendorGuid:EFI_GUID,DataAttribute:c_uint16,
+                                 DataHeaderSize:c_uint32,InputFileName=[],InputFileAlign=[],OutFileBuffer=b'') -> int:
     
     logger=logging.getLogger('GenSec')
     
@@ -510,8 +510,8 @@ def GenSectionGuidDefinedSection(InputFileNum:int,VendorGuid:EFI_GUID,DataAttrib
 #Generate a section of type EFI_SECTION_FREEROM_SUBTYPE_GUID
 #The function won't validate the input files contents.
 #The utility will add section header to the file
-def GenSectionSubtypeGuidSection(InputFileNum:int,SubTypeGuid:EFI_GUID,
-                                InputFileName=[],InputFileAlign=[],OutFileBuffer=b'') -> int:
+def GenSectionSubtypeGuidSection(InputFileNum:c_uint32,SubTypeGuid:EFI_GUID,
+                                InputFileName=[],InputFileAlign=[],OutFileBuffer=b''):
     
     logger = logging.getLogger('GenSec')
     
@@ -587,7 +587,7 @@ def GenSectionSubtypeGuidSection(InputFileNum:int,SubTypeGuid:EFI_GUID,
 
 
 #Support routine for th PE/COFF file Loader that reads a buffer from a PE/COFF file
-def FfsRebaseImageRead(FileOffset:int,ReadSize:int,FileHandle = b'',Buffer = b'') -> int:
+def FfsRebaseImageRead(FileOffset:c_uint64,ReadSize:c_uint32,FileHandle = b'',Buffer = b'') -> int:
     Destination8 = Buffer
     Source8 = FileHandle[FileOffset:]
     Length = ReadSize
@@ -603,7 +603,7 @@ def FfsRebaseImageRead(FileOffset:int,ReadSize:int,FileHandle = b'',Buffer = b''
 
 #InFile is input file for getting alignment
 #return the alignment
-def GetAlignmentFromFile(InFile:str,Alignment:int) -> int:
+def GetAlignmentFromFile(InFile:str,Alignment:c_uint32) -> int:
 
     PeFileBuffer = b''
     
