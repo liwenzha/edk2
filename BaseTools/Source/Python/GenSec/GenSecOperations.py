@@ -188,7 +188,7 @@ def GetSectionContents(InputFileNum:c_uint32,BufferLength:c_uint32,InputFileName
         #Make sure section ends on a DWORD boundary
         while Size & 0x03 != 0:
             if FileBuffer != None and Size < BufferLength:
-                FileBuffer = FileBuffer + b'0'
+                FileBuffer = FileBuffer + b'\0'
             Size += 1
             
         #Open file and read contents 
@@ -289,6 +289,7 @@ def GenSectionCompressionSection(InputFileNum:c_uint32,SectCompSubType:c_uint8,I
     OutputBuffer = b''
     InputLength = 0
     CompressedLength = 0
+    TotalLength = 0
     res = GetSectionContents(InputFileNum,InputLength,InputFileName,InputFileAlign,FileBuffer)
     if type(res) == 'int':
         Status = res
@@ -340,13 +341,14 @@ def GenSectionCompressionSection(InputFileNum:c_uint32,SectCompSubType:c_uint8,I
             Status = res[0]
             OutputBuffer = res[1]
             CompressedLength = res[2]
-            print(res)
+            #print(res)
             
         if Status == EFI_BUFFER_TOO_SMALL:
             HeaderLength = sizeof(EFI_COMPRESSION_SECTION)
             if CompressedLength + HeaderLength >= MAX_SECTION_SIZE:
                 HeaderLength = sizeof(EFI_COMPRESSION_SECTION2)
             TotalLength = CompressedLength + HeaderLength
+            OutputBuffer = b'\0' * TotalLength
             res = CompressFunction(InputLength,CompressedLength,FileBuffer,OutputBuffer)
             if type(res) == 'int':
                 Status = res
@@ -354,7 +356,7 @@ def GenSectionCompressionSection(InputFileNum:c_uint32,SectCompSubType:c_uint8,I
                 Status = res[0]
                 OutputBuffer = res[1]
                 CompressedLength = res[2]
-                print(res)
+                #print(res)
             
         FileBuffer = OutputBuffer
             
