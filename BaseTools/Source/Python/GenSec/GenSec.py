@@ -328,7 +328,7 @@ def main():
     #GuidValue is only required by Guided section and SubtypeGuid section.
     if SectType != EFI_SECTION_GUID_DEFINED and SectType != EFI_SECTION_FREEFORM_SUBTYPE_GUID and\
         SectionName != None and (CompareGuid (VendorGuid, mZeroGuid) != 0):
-            print("Warning: the input guid value is not required for this section type %s\n", SectionName)
+            print("Warning: the input guid value is not required for this section type %s\n" %SectionName)
     
     #Check whether there is GUID for the SubtypeGuid section
     if SectType == EFI_SECTION_FREEFORM_SUBTYPE_GUID and (CompareGuid (VendorGuid, mZeroGuid) == 0):
