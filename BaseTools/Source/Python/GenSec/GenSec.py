@@ -52,7 +52,7 @@ parser.add_argument("--dummy",dest="dummyfile",help="compare dummyfile with inpu
 parser.add_argument("-v","--verbose",dest="verbose",help="Turn on verbose output with informational messages.")
 parser.add_argument("-q","--quiet",dest="quiet",help="Disable all messages except key message and fatal error")
 parser.add_argument("-d","--debug",dest="debug_level",help="Enable debug messages, at input debug level.")
-parser.add_argument("--version", action="version", version='%(prog)s Version 1.0',
+parser.add_argument("--version", action="version", version='%s Version %d.%d'%(UTILITY_NAME,UTILITY_MINOR_VERSION,UTILITY_MAJOR_VERSION),
                     help="Show program's version number and exit.")
         
 
