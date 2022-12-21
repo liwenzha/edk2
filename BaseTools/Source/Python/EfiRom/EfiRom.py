@@ -499,7 +499,8 @@ def ParseCommandLine(Options:OPTIONS):
             
         #Process until another dash-argument parameter or the end of the list
         if argc > 1:
-          for arg in sys.argv[2:]:
+          pars = sys.argv[2:][::2]    #Choose the actual argument in the command line
+          for arg in pars:
             res = AsciiStringToUint64(arg, False, TempValue)
             if type(int) == 'int':
                 Status = res
