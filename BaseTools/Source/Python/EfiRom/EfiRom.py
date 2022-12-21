@@ -20,6 +20,10 @@ from FirmwareStorageFormat.SectionHeader import *
 
 STATUS_SUCCESS = 0
 STATUS_ERROR = 2
+FILE_FLAG_BINARY = 0x01
+FILE_FLAG_EFI = 0x02
+FILE_FLAG_COMPRESS = 0x04
+
 mOptions = OPTIONS()
 
 parser = argparse.ArgumentParser(description='''
@@ -438,6 +442,7 @@ def Done(ReturnStatus,Options):
 
 #Given the Argc/Argv program arguments, and a pointer to an options structure,
 #parse the command-line options and check their validity.
+#This is the specific command line parsing function
 def ParseCommandLine(Options:OPTIONS):
     
     FileList = FILE_LIST()
@@ -448,10 +453,10 @@ def ParseCommandLine(Options:OPTIONS):
     EfiRomFlag = False
     FileList = PrevFileList = None
     Options.DevIdCount = 0
+    TempValue = 0
     
     args = parser.parse_args()
     argc = len(sys.argv)
-    TempValue = 0
     
     if argc == 1 or 0:
         parser.print_help()
@@ -471,8 +476,50 @@ def ParseCommandLine(Options:OPTIONS):
         if EFI_ERROR (Status):
             logger.error("Invalid option value.")
             ReturnStatus = 1
-    elif args.DeviceId:
-        pass
+            goto Done
+        if TempValue >= 0x10000:
+            logger.error("Invalid option value, Vendor Id %s out of range!" %args.VendorId)
+            ReturnStatus = 1
+            goto Done
+            
+        Options.VendId = TempValue
+        Options.VendIdValid = 1
+        
+    # elif args.DeviceId:
+    #     OptionName = '-i'
+    #     #Process until another dash-argument or the end of the list
+    
+    elif args.outputfile:
+        #Output filename specified with -o
+        if len(args.outputfile) > MAX_PATH - 1:
+            logger.error("Invalid parameter, Output file name %s is too long!" %args.outputfile)
+            ReturnStatus = STATUS_ERROR
+            goto Done
+        Options.OutFileName = args.outputfile[0:MAX_PATH - 1]
+        Options.OutFileName[MAX_PATH - 1] = 0
+        
+    elif args.BinFileName:
+        #Specify binary files with -b
+        FileFlags = FILE_FLAG_BINARY
+        
+    elif args.EfiFileName or args.EfiFileName_Compress:
+        #Specify EFI files with -e. Specify EFI-compressed with -c.
+        FileFlags = FILE_FLAG_EFI
+        if args.EfiFileName_Compress:
+            FileFlags |= FILE_FLAG_COMPRESS
+            
+    #Specify not to set the LAST bit in the last file with -n
+    elif args.not_auto:
+        Options.NoLast = 1
+    
+    #-v for verbose
+    elif args.verbose:
+        Options.verbose = 1
+    
+    elif :
+        
+        
+        
 
 
 #GC_TODO: Add function description
