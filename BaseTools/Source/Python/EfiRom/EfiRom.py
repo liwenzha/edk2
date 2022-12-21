@@ -571,7 +571,7 @@ def DumpImage(InFile:FILE_LIST):
             InFptr.close()
             
         #Dump the contents of the header
-        print("Image %u -- Offset 0x%x\n" %ImageCount, ImageStart)
+        print("Image %u -- Offset 0x%x\n" %(ImageCount, ImageStart))
         print("ROM header contents\n")
         print("    Signature              0x%04x\n" %PciRomHdr.Signature)
         print("    PCIR offset            0x%04x\n" %PciRomHdr.PcirOffset)
