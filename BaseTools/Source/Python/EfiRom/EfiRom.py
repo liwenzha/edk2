@@ -23,12 +23,14 @@ STATUS_ERROR = 2
 FILE_FLAG_BINARY = 0x01
 FILE_FLAG_EFI = 0x02
 FILE_FLAG_COMPRESS = 0x04
+DebugLevel = 0
 
 mOptions = OPTIONS()
 
 parser = argparse.ArgumentParser(description='''
 Utility program to create an EFI option ROM image from binary and EFI PE32 files.
 ''')
+parser.add_argument("input",dest ="inputfile",help = "Input Filename.")
 parser.add_argument("-o","--output",dest ="outputfile",help = "Output Filename.File will be created to store the output content.")
 parser.add_argument("-e",dest = "EfiFileName",help = "EFI PE32 image files.")
 parser.add_argument("-ec",dest = "EfiFileName_Compress",help = "EFI PE32 image files and will be compressed.")
@@ -453,6 +455,7 @@ def ParseCommandLine(Options:OPTIONS):
     EfiRomFlag = False
     FileList = PrevFileList = None
     Options.DevIdCount = 0
+    DevIdList = None
     TempValue = 0
     
     args = parser.parse_args()
@@ -464,6 +467,7 @@ def ParseCommandLine(Options:OPTIONS):
         return STATUS_ERROR
     
     #Start to parse
+    #Parse the optional arguments
     if args.VendorId:
         #Make sure there's another parameter
         res = AsciiStringToUint64(args.VendorId,False,TempValue)
@@ -485,41 +489,120 @@ def ParseCommandLine(Options:OPTIONS):
         Options.VendId = TempValue
         Options.VendIdValid = 1
         
-    # elif args.DeviceId:
-    #     OptionName = '-i'
-    #     #Process until another dash-argument or the end of the list
-    
-    elif args.outputfile:
-        #Output filename specified with -o
-        if len(args.outputfile) > MAX_PATH - 1:
-            logger.error("Invalid parameter, Output file name %s is too long!" %args.outputfile)
-            ReturnStatus = STATUS_ERROR
+    if args.DeviceId:
+        OptionName = '-i'
+        #Device IDs specified with -i
+        #Make sure there's at least one more parameter
+        if argc == 1:
+            ReturnStatus = 1
             goto Done
-        Options.OutFileName = args.outputfile[0:MAX_PATH - 1]
-        Options.OutFileName[MAX_PATH - 1] = 0
-        
-    elif args.BinFileName:
+            
+        #Process until another dash-argument parameter or the end of the list
+        if argc > 1:
+          for arg in sys.argv[2:]:
+            res = AsciiStringToUint64(arg, False, TempValue)
+            if type(int) == 'int':
+                Status = res
+            else:
+                Status = res[0]
+                TempValue = res[1]
+            if EFI_ERROR (Status):
+                logger.error("Invalid option value, %s = %s" %(OptionName,arg))
+                ReturnStatus = 1
+                goto Done
+            #Dont allow deveice IDs greater than 16 bits
+            #Dont allow 0,since it is used as a list terminator
+            if TempValue >= 0x10000 or TempValue == 0:
+                logger.error("Invalid option value, Device Id %s out of range!" %arg)
+                ReturnStatus = 1
+                goto Done
+            Options.DevIdList = DevIdList
+            Options.DevIdList[Options.DevIdCount] = TempValue
+            DevIdCount += 1
+            
+    if args.outputfile:
+        #Output filename specified with -o
+        #Make sure there's another parameter
+        if args.outputfile >= MAX_PATH - 1:
+            logger.error("Invalid parameter, Output file name %s is too long!" %args.outputfile)
+            ReturnStatus = 1
+            goto Done
+        Options.OutFileName = args.outputfile[0:MAX_PATH - 1]\
+            
+    if args.BinFileName:
         #Specify binary files with -b
         FileFlags = FILE_FLAG_BINARY
-        
-    elif args.EfiFileName or args.EfiFileName_Compress:
+
+    if args.EfiFileName or args.EfiFileName_Compress:
         #Specify EFI files with -e. Specify EFI-compressed with -c.
         FileFlags = FILE_FLAG_EFI
         if args.EfiFileName_Compress:
             FileFlags |= FILE_FLAG_COMPRESS
             
     #Specify not to set the LAST bit in the last file with -n
-    elif args.not_auto:
+    if args.not_auto:
         Options.NoLast = 1
     
     #-v for verbose
-    elif args.verbose:
+    if args.verbose:
         Options.verbose = 1
     
-    elif :
+    if args.debug_level:
+        res = AsciiStringToUint64(args.debug_leve, False, DebugLevel)
+        if type(res) == 'int':
+            Status = res
+        else:
+            Status = res[0]
+            DebugLevel = res[1]
+        if EFI_ERROR(Status):
+            logger.error("Invalid option value, %s = %s" %('--debug',args.debug_level))
+            ReturnStatus = 1
+            goto Done;        
+        if DebugLevel > 9:
+            logger.error("Invalid option value,Debug Level range is 0-9, current input level is %d" %args.debug_level)
+            ReturnStatus = 1
+            goto Done
+        if DebugLevel >= 5 and DebugLevel <= 9:
+            Options.Debug = True
+        else:
+            Options.Debug = False
         
+    if args.quiet:
+        Options.Quiet = True
+    
+    if args.dumpimage:
+        #-dump for dumping a ROM image. In this case, say that the device id
+        #and vendor id are valid so we don't have to specify bogus ones on the
+        #command line.
+        Options.DumpOption   = 1
+        Options.VendIdValid  = 1
+        Options.DevIdCount   = 1
+        FileFlags = FILE_FLAG_BINARY
         
+    if args.ClassCode:
+        #Class code value for the next file in the list.
+        #Make sure there's another parameter
+        res = AsciiStringToUint64(args.ClassCode, False, TempValue)
+        if type(res) == 'int':
+            Status = res
+        else:
+            Status = res[0]
+            TempValue = res[1]
+        if EFI_ERROR(Status):
+            logger.error("Invalid option value", "%s = %s" %('--class-code',args.ClassCode))
+            ReturnStatus = 1
+            goto Done
+        ClassCode = TempValue
+        if ClassCode & 0xFF000000:
+            logger.error("Invalid parameter", "Class code %s out of range!" %args.ClassCod)
+            ReturnStatus = 1
+            goto Done
+        if FileList != None and FileList.ClassCode == 0:
+            FileList.ClassCode = ClassCode
         
+
+
+
 
 
 #GC_TODO: Add function description
