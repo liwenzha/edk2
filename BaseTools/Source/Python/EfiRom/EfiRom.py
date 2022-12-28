@@ -30,7 +30,7 @@ mOptions = OPTIONS()
 parser = argparse.ArgumentParser(description='''
 Utility program to create an EFI option ROM image from binary and EFI PE32 files.
 ''')
-parser.add_argument("input",help = "Input Filename.")
+parser.add_argument("input",help = "Input Filename.")  #似乎不需要单独列出来输入的文件
 parser.add_argument("-o","--output",dest ="outputfile",help = "Output Filename.File will be created to store the output content.")
 parser.add_argument("-e",dest = "EfiFileName",help = "EFI PE32 image files.")
 parser.add_argument("-ec",dest = "EfiFileName_Compress",help = "EFI PE32 image files and will be compressed.")
@@ -346,8 +346,9 @@ def ProcessEfiFile(OutFptr,InFile:FILE_LIST,VendId:c_uint16,DevId:c_uint16,Size:
     
     #Write the Device ID list to the output file
     if mOptions.DevIdCount > 1:
-        OutFptr.write(mOptions.DevIdList.to_bytes(2,byteorder='little'))
-        if len(mOptions.DevIdCount.to_bytes(2,byteorder='little')) == 0:
+        for item in mOptions.DevIdList[0:mOptions.DevIdCount]:
+            OutFptr.write(item.to_bytes(2,byteorder='little'))
+        if OutFptr.read() == None:
             logger.error("Failed to write PCI ROM header to output file!")
             Status = STATUS_ERROR
             return Status
@@ -434,7 +435,7 @@ def CheckPE32File(Fptr,MachineType:c_uint16,SubSystem:c_uint16):
 
 
 #Status processing
-def Done(ReturnStatus,Options):
+def Done(ReturnStatus:int,Options:OPTIONS):
     if ReturnStatus != 0:
         while Options.FileList != None:
             FileList = Options.FileList.Next
@@ -442,20 +443,19 @@ def Done(ReturnStatus,Options):
     return ReturnStatus
 
 
-def BailOut(Status:int,mOptions:OPTIONS,if_error:bool):
-    if Status == STATUS_SUCCESS:
-        #Clean up file list
-        while mOptions.FileList != None:
-            FList = mOptions.FileList.Next
-            mOptions.FileList = FList
-        
-        if if_error:
-            Status = STATUS_ERROR
+def BailOut(Status:int,if_error:bool):
+    # if Status == STATUS_SUCCESS:
+    #     #Clean up file list
+    #     while mOptions.FileList != None:
+    #         FList = mOptions.FileList.Next
+    #         mOptions.FileList = FList
+
+    if if_error:
+        Status = STATUS_ERROR
     return Status
     
 
-#Given the Argc/Argv program arguments, and a pointer to an options structure,
-#parse the command-line options and check their validity.
+#Parse the command-line options and check their validity.
 #This is the specific command line parsing function
 def ParseCommandLine(Options:OPTIONS):
     
@@ -479,7 +479,7 @@ def ParseCommandLine(Options:OPTIONS):
         return STATUS_ERROR
     
     #Start to parse command line arguments
-    #Parse the optional arguments
+    #First parse the optional arguments
     if args.VendorId:
         #Make sure there's another parameter
         res = AsciiStringToUint64(args.VendorId,False,TempValue)
@@ -511,8 +511,6 @@ def ParseCommandLine(Options:OPTIONS):
             
         #Process until another dash-argument parameter or the end of the list
         #Because -i maybe have one or more arguments
-        #DevIdList = b'\0'* (len(args.DeviceId))
-        #Options.DevIdList = DevIdList
         for arg in args.DeviceId:
             res = AsciiStringToUint64(arg, False, TempValue)
             if type(int) == 'int':
@@ -531,7 +529,7 @@ def ParseCommandLine(Options:OPTIONS):
                 ReturnStatus = 1
                 Done(ReturnStatus,Options)
             
-            Options.DevIdList[Options.DevIdCount] = TempValue.to_bytes(2,'little')
+            Options.DevIdList[Options.DevIdCount] = TempValue
             Options.DevIdCount += 1
             
     if args.outputfile:
@@ -542,7 +540,7 @@ def ParseCommandLine(Options:OPTIONS):
             ReturnStatus = 1
             Done(ReturnStatus,Options)
             
-        if args.outputfile >= MAX_PATH - 1:
+        if len(args.outputfile) >= MAX_PATH - 1:
             logger.error("Invalid parameter, Output file name %s is too long!" %args.outputfile)
             ReturnStatus = 1
             Done(ReturnStatus,Options) 
@@ -659,7 +657,7 @@ def ParseCommandLine(Options:OPTIONS):
     i = 0
     while args.input:
         if (FileFlags & (FILE_FLAG_BINARY | FILE_FLAG_EFI)) == 0:
-            logger.error("Invalid parameter", "Missing -e or -b with input file %s!" %sys.argv[0])
+            logger.error("Invalid parameter, Missing -e or -b with input file %s!" %sys.argv[0])
             ReturnStatus = 1
             Done(ReturnStatus,Options)
             
@@ -916,24 +914,24 @@ def main():
         if mOptions.FileList != None:
             if mOptions.FileList.FileName.find(DEFAULT_OUTPUT_EXTENSION) != -1:
                 DumpImage(mOptions.FileList)
-                BailOut(Status,mOptions,if_error)
+                BailOut(Status,if_error)
             else:
                 logger.error("No PciRom input file, No *.rom input file")
                 if_error = True
-                BailOut(Status,mOptions,if_error)
+                BailOut(Status,if_error)
     
     #Determine the output filename. Either what they specified on
     #the command line, or the first input filename with a different extension.
-    if mOptions.OutFileName[0] == None:
+    if mOptions.OutFileName == None:
         if mOptions.FileList != None:
             if len(mOptions.FileList.FileName) >= MAX_PATH:
                 Status = STATUS_ERROR
                 logger.error("Invalid parameter, Input file name is too long - %s." %mOptions.FileList.FileName)
                 if_error = True
-                BailOut(Status,mOptions,if_error)
+                BailOut(Status,if_error)
                 
-            mOptions.OutFileName = mOptions.FileList.FileName  #这个拷贝文件名需要考虑下
-            mOptions.OutFileName[MAX_PATH - 1] = 0
+            mOptions.OutFileName = mOptions.FileList.FileName  
+            mOptions.OutFileName += '/0'   #以/0结尾
             
             #Find the last . on the line and replace the filename extension with
             #the default
@@ -947,8 +945,10 @@ def main():
                 
             #If dot here,then insert extension here, otherwise append
             if (Ext[ExtAdd] != '.'):
-                ExtAdd = len (mOptions.OutFileName)
-            Ext = DEFAULT_OUTPUT_EXTENSION
+                # ExtAdd = len (mOptions.OutFileName)
+                Ext = Ext + DEFAULT_OUTPUT_EXTENSION
+            Ext = Ext.replace(Ext[ExtAdd:],DEFAULT_OUTPUT_EXTENSION)
+            #Ext[ExtAdd:] = DEFAULT_OUTPUT_EXTENSION
             
     #Make sure we don't have the same filename for input and output files
     FList = mOptions.FileList
@@ -957,7 +957,7 @@ def main():
             Status = STATUS_ERROR
             logger.error("Invalid input parameter, Input and output file names must be different - %s = %s." %(FList.FileName, mOptions.OutFileName))
             if_error = True
-            BailOut(Status,mOptions,if_error)
+            BailOut(Status,if_error)
         FList = FList.Next
 
     #Now open our output file
@@ -966,7 +966,7 @@ def main():
         if FptrOut == None:
             logger.error("Error opening file, Error opening file %s" %mOptions.OutFileName)
             if_error = True
-            BailOut(Status,mOptions,if_error)
+            BailOut(Status,if_error)
 
     #Process all our files
     TotalSize = 0

@@ -44,8 +44,8 @@ class FILE_LIST(Structure):
     def __init__(self):
         self.Next = None
         
-    __pack__ = 1
-    __fields__ =[
+    _pack_ = 1
+    _fields_ =[
         #('Next',FILE_LIST),
         ('FileName',c_char),
         ('FileFlags',c_uint32),
@@ -55,15 +55,16 @@ class FILE_LIST(Structure):
 
 
 #Use this to track our command-line options
+
 class OPTIONS(Structure):
-    __pack__ = 1
-    __fields__ =[
+    _pack_ = 1
+    _fields_ =[
         ('OutFileName',c_char),
         ('NoLast',c_int8),
         ('ClassCode',c_uint16),
         ('PciRevision',c_uint16),
         ('VendId',c_uint16),
-        ('DevIdList',bytes),
+        ('DevIdList',ARRAY(c_uint16,100)),
         ('DevIdCount',c_uint32),
         ('VendIdValid',c_uint8),
         ('Verbose',c_uint8),
@@ -73,13 +74,13 @@ class OPTIONS(Structure):
         ('Pci30',c_uint8),
         ('DumpOption',c_uint8),
         ('FileList',FILE_LIST)
-
     ]
+
     
 
 class PCI_EXPANSION_ROM_HEADER(Structure):
-    __pack__ = 1
-    __fields__ =[
+    _pack_ = 1
+    _fields_ =[
         ('Signature',c_uint16),        #0xaa55
         ('Reserved',ARRAY(c_uint,0X16)),
         ('PcirOffset',c_uint16)
@@ -87,8 +88,8 @@ class PCI_EXPANSION_ROM_HEADER(Structure):
     
 
 class PCI_DATA_STRUCTURE(Structure):
-    __pack__ = 1
-    __fields__ =[
+    _pack_ = 1
+    _fields_ =[
         ('Signature',c_uint32),        #PCIR
         ('VendorId',c_uint16),
         ('DeviceId',c_uint16),
@@ -105,8 +106,8 @@ class PCI_DATA_STRUCTURE(Structure):
     
     
 class PCI_3_0_DATA_STRUCTURE(Structure):
-    __pack__ = 1
-    __fields__ =[
+    _pack_ = 1
+    _fields_ =[
         ('Signature',c_uint32),        #PCIR
         ('VendorId',c_uint16),
         ('DeviceId',c_uint16),
@@ -125,8 +126,8 @@ class PCI_3_0_DATA_STRUCTURE(Structure):
     
     
 class EFI_PCI_EXPANSION_ROM_HEADER(Structure):
-    __pack__ = 1
-    __fields__ =[
+    _pack_ = 1
+    _fields_ =[
         ('Signature',c_uint16),             #0xaa55
         ('InitializationSize',c_uint16),
         ('EfiSignature',c_uint32),          #0x0EF1
@@ -140,8 +141,8 @@ class EFI_PCI_EXPANSION_ROM_HEADER(Structure):
     
     
 class EFI_IMAGE_DOS_HEADER(Structure):
-    __pack__ = 1
-    __fields__ =[
+    _pack_ = 1
+    _fields_ =[
         ('e_magic',c_uint16),             #Magic number
         ('e_cblp',c_uint16),              #Bytes on last page of file
         ('e_cp',c_uint16),                #Pages in file
@@ -165,8 +166,8 @@ class EFI_IMAGE_DOS_HEADER(Structure):
 
 
 class EFI_IMAGE_FILE_HEADER(Structure):
-    __pack__ = 1
-    __fields__ =[
+    _pack_ = 1
+    _fields_ =[
         ('Machine',c_uint16),             
         ('NumberOfSections',c_uint16),
         ('TimeDateStamp',c_uint32),
@@ -179,16 +180,16 @@ class EFI_IMAGE_FILE_HEADER(Structure):
 
 
 class EFI_IMAGE_DATA_DIRECTORY(Structure):
-    __pack__ = 1
-    __fields__ = [
+    _pack_ = 1
+    _fields_ = [
         ('VirtualAddress',c_uint32),
         ('Size',c_uint32),
     ]
     
     
 class EFI_IMAGE_OPTIONAL_HEADER32(Structure):
-    __pack__ = 1
-    __fileds__=[
+    _pack_ = 1
+    _fileds_=[
         #Standard fields.
         ('Magic',c_uint16),
         ('MajorLinkerVersion',c_uint8),
