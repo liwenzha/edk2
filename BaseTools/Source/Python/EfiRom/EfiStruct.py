@@ -41,9 +41,9 @@ DEFAULT_OUTPUT_EXTENSION = ".rom"
 #Use this linked list structure to keep track of all the filenames
 #specified on the command line.
 class FILE_LIST(Structure):
-    def __init__(self):
-        self.Next = None
-        
+    # def __init__(self):
+    #     self.Next = None
+       
     _pack_ = 1
     _fields_ =[
         #('Next',FILE_LIST),

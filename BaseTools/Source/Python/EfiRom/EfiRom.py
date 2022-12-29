@@ -25,6 +25,9 @@ FILE_FLAG_EFI = 0x02
 FILE_FLAG_COMPRESS = 0x04
 DebugLevel = 0
 
+UTILITY_NAME = "EfiRom"
+UTILITY_MAJOR_VERSION = 0
+UTILITY_MINOR_VERSION = 1
 mOptions = OPTIONS()
 
 parser = argparse.ArgumentParser(description='''
@@ -45,14 +48,14 @@ parser.add_argument("-d","--dump",dest = "dumpimage",help = "Dump the headers of
 parser.add_argument("-v","--verbose",dest="verbose",help="Turn on verbose output with informational messages.")
 parser.add_argument("-q","--quiet",dest="quiet",help="Disable all messages except key message and fatal error")
 parser.add_argument("--debug",dest="debug_level",help="Enable debug messages, at input debug level.")
-parser.add_argument("--version", action="version", version='%(prog)s Version 1.0',
+parser.add_argument("--version", action="version", version='%s Version %d.%d' %(UTILITY_NAME,UTILITY_MAJOR_VERSION,UTILITY_MINOR_VERSION),
                     help="Show program's version number and exit.")
 
 logger=logging.getLogger('EfiRom')
 
 
 #Process a binary input file
-def ProcessBinFile(OutFptr,InFile:FILE_LIST,Size:int) -> int:
+def ProcessBinFile(OutFptr,InFile:FILE_LIST,Size:int,Num:int,Length:int) -> int:
     
     Status = STATUS_SUCCESS
     #Try to open the input file
@@ -114,7 +117,7 @@ def ProcessBinFile(OutFptr,InFile:FILE_LIST,Size:int) -> int:
         
     #If this is the last image, then set the LAST bit unless requested not
     #to via the command-line -n argument. Otherwise, make sure you clear it.
-    if InFile.Next == None and mOptions.NoLast == 0:
+    if Num == Length - 1 and mOptions.NoLast == 0:
         if mOptions.Pci23 == 1:
             PciDs23.Indicator = INDICATOR_LAST
         else:
@@ -144,13 +147,13 @@ def ProcessBinFile(OutFptr,InFile:FILE_LIST,Size:int) -> int:
     while TotalSize > 0:
         # putc (~0, OutFptr)
         a = ~0
-        OutFptr.write(a.to_bytes(1,byteorder= 'little'))
+        OutFptr.write(a.to_bytes(1,byteorder= 'little',signed=True))
         TotalSize -= 1
     return Status,Size
 
 
 #Process a PE32 EFI file.
-def ProcessEfiFile(OutFptr,InFile:FILE_LIST,VendId:c_uint16,DevId:c_uint16,Size:c_uint32):
+def ProcessEfiFile(OutFptr,InFile:FILE_LIST,VendId:c_uint16,DevId:c_uint16,Size:c_uint32,Num:int,Length:int):
 
     Status = STATUS_SUCCESS
     MachineType = 0
@@ -303,7 +306,7 @@ def ProcessEfiFile(OutFptr,InFile:FILE_LIST,VendId:c_uint16,DevId:c_uint16,Size:
         
     #If this is the last image, then set the LAST bit unless requested not
     #to via the command-line -n argument.
-    if InFile.Next == None and mOptions.NoLast == 0:
+    if Num == Length - 1 and mOptions.NoLast == 0:
         if mOptions.Pci23 == 1:
             PciDs23.Indicator = INDICATOR_LAST
         else:
@@ -323,7 +326,7 @@ def ProcessEfiFile(OutFptr,InFile:FILE_LIST,VendId:c_uint16,DevId:c_uint16,Size:
     
     #Write pad bytes to align the PciDs
     while HeaderPadBytes > 0:
-        OutFptr.write(b'0')
+        OutFptr.write(b'\0')
         if OutFptr.tell() == os.SEEK_END:
             logger.error("Failed to write PCI ROM header to output file!")
             Status = STATUS_ERROR
@@ -354,8 +357,8 @@ def ProcessEfiFile(OutFptr,InFile:FILE_LIST,VendId:c_uint16,DevId:c_uint16,Size:
             return Status
         
         #Write two-byte terminating 0 at the end of the device list
-        OutFptr.write(b'0')
-        OutFptr.write(b'0')
+        OutFptr.write(b'\0')
+        OutFptr.write(b'\0')
         if OutFptr.tell() == os.SEEK_END:
             logger.error("Failed to write PCI ROM header to output file!")
             Status = STATUS_ERROR
@@ -363,7 +366,8 @@ def ProcessEfiFile(OutFptr,InFile:FILE_LIST,VendId:c_uint16,DevId:c_uint16,Size:
         
     #Pad head to make it a multiple of 512 bytes
     while PadBytesBeforeImage > 0:
-        OutFptr.write(b'-1')
+        a = -1
+        OutFptr.write(a.to_bytes(1,byteorder='little',signed = True))
         if OutFptr.tell() == os.SEEK_END:
             logger.error("Failed to write trailing pad bytes output file!")
             Status = STATUS_ERROR
@@ -379,7 +383,8 @@ def ProcessEfiFile(OutFptr,InFile:FILE_LIST,VendId:c_uint16,DevId:c_uint16,Size:
     
     #Pad the rest of the image to make it a multiple of 512 bytes
     while PadBytesAfterImage > 0:
-        OutFptr.write(b'-1')
+        b = -1
+        OutFptr.write(b.to_bytes(1,byteorder='little',signed = True))
         if OutFptr.tell() == os.SEEK_END:
             logger.error("Failed to write trailing pad bytes output file!")
             Status = STATUS_ERROR
@@ -434,12 +439,8 @@ def CheckPE32File(Fptr,MachineType:c_uint16,SubSystem:c_uint16):
     return Status,MachineType,SubSystem
 
 
-#Status processing
-def Done(ReturnStatus:int,Options:OPTIONS):
-    if ReturnStatus != 0:
-        while Options.FileList != None:
-            FileList = Options.FileList.Next
-            Options.FileList = FileList
+#Status processing,no need this function
+def Done(ReturnStatus:int):
     return ReturnStatus
 
 
@@ -457,17 +458,18 @@ def BailOut(Status:int,if_error:bool):
 
 #Parse the command-line options and check their validity.
 #This is the specific command line parsing function
-def ParseCommandLine(Options:OPTIONS):
-    
+def ParseCommandLine(Options:OPTIONS,FileLists=[]):
     FileList = FILE_LIST()
-    PrevFileList = FILE_LIST()
+    # PrevFileList = FILE_LIST()
+    #FileList = []
     
     ReturnStatus = 0
     FileFlags = 0
     EfiRomFlag = False
-    FileList = PrevFileList = None
+    # FileList = PrevFileList = None
     Options.DevIdCount = 0
-    #DevIdList = b''
+    ClassCode = 0
+    CodeRevision = 0
     TempValue = 0
     
     args = parser.parse_args()
@@ -492,11 +494,11 @@ def ParseCommandLine(Options:OPTIONS):
         if EFI_ERROR (Status):
             logger.error("Invalid option value.")
             ReturnStatus = 1
-            Done(ReturnStatus,Options)
+            Done(ReturnStatus)
         if TempValue >= 0x10000:
             logger.error("Invalid option value, Vendor Id %s out of range!" %args.VendorId)
             ReturnStatus = 1
-            Done(ReturnStatus,Options)
+            Done(ReturnStatus)
             
         Options.VendId = TempValue
         Options.VendIdValid = 1
@@ -507,7 +509,7 @@ def ParseCommandLine(Options:OPTIONS):
         #Make sure there's at least one more parameter
         if argc == 1:
             ReturnStatus = 1
-            Done(ReturnStatus,Options)
+            Done(ReturnStatus)
             
         #Process until another dash-argument parameter or the end of the list
         #Because -i maybe have one or more arguments
@@ -521,13 +523,13 @@ def ParseCommandLine(Options:OPTIONS):
             if EFI_ERROR (Status):
                 logger.error("Invalid option value, %s = %s" %(OptionName,arg))
                 ReturnStatus = 1
-                Done(ReturnStatus,Options)
+                Done(ReturnStatus)
             #Dont allow deveice IDs greater than 16 bits
             #Dont allow 0,since it is used as a list terminator
             if TempValue >= 0x10000 or TempValue == 0:
                 logger.error("Invalid option value, Device Id %s out of range!" %arg)
                 ReturnStatus = 1
-                Done(ReturnStatus,Options)
+                Done(ReturnStatus)
             
             Options.DevIdList[Options.DevIdCount] = TempValue
             Options.DevIdCount += 1
@@ -538,24 +540,69 @@ def ParseCommandLine(Options:OPTIONS):
         if args.outputfile == None or args.outputfile[0] == '-':
             logger.error("Invalid parameter, Missing output file name with %s option!" %'-o')
             ReturnStatus = 1
-            Done(ReturnStatus,Options)
+            Done(ReturnStatus)
             
         if len(args.outputfile) >= MAX_PATH - 1:
             logger.error("Invalid parameter, Output file name %s is too long!" %args.outputfile)
             ReturnStatus = 1
-            Done(ReturnStatus,Options) 
+            Done(ReturnStatus) 
         Options.OutFileName = args.outputfile[0: MAX_PATH - 1]
             
     if args.BinFileName:
-        #Specify binary files with -b
+        if args.BinFileName == None:
+            logger.error("Missing Binary files!")
+            ReturnStatus = STATUS_ERROR
+            Done(ReturnStatus)
+        # FileList = FILE_LIST()
         FileFlags = FILE_FLAG_BINARY
+        
+        FileList.FileName = args.BinFileName
+        FileList.FileFlags     = FileFlags
+        FileList.ClassCode     = ClassCode
+        FileList.CodeRevision  = CodeRevision
+        ClassCode               = 0
+        CodeRevision            = 0
+        #Options.FileList = FileList
+        FileLists.append(FileList)
 
     if args.EfiFileName or args.EfiFileName_Compress:
+        if args.BinFileName == None:
+            logger.error("Missing Binary files!")
+            ReturnStatus = STATUS_ERROR
+            Done(ReturnStatus)
+        
         #Specify EFI files with -e. Specify EFI-compressed with -c.
         FileFlags = FILE_FLAG_EFI
         if args.EfiFileName_Compress:
             FileFlags |= FILE_FLAG_COMPRESS
             
+        FileList.FileName = args.EfiFileName
+        FileList.FileFlags     = FileFlags
+        FileList.ClassCode     = ClassCode
+        FileList.CodeRevision  = CodeRevision
+        ClassCode               = 0
+        CodeRevision            = 0
+        #Options.FileList = FileList
+        FileLists.append(FileList)
+        EfiRomFlag = True
+    
+        if EfiRomFlag:
+            if Options.VendIdValid == None:
+                logger.error("Missing Vendor ID in command line")
+                ReturnStatus = STATUS_ERROR
+                Done(ReturnStatus)
+            
+            if Options.DevIdCount == None:
+                logger.error("Missing Device ID in command line")
+                ReturnStatus = STATUS_ERROR
+                Done(ReturnStatus)
+        
+        if Options.DevIdCount > 1 and Options.Pci23:
+            logger.error("Invalid parameter, PCI 3.0 is required when specifying multiple Device IDs")
+            ReturnStatus = STATUS_ERROR
+            Done(ReturnStatus)
+        
+        
     #Specify not to set the LAST bit in the last file with -n
     if args.not_auto:
         Options.NoLast = 1
@@ -574,11 +621,11 @@ def ParseCommandLine(Options:OPTIONS):
         if EFI_ERROR(Status):
             logger.error("Invalid option value, %s = %s" %('--debug',args.debug_level))
             ReturnStatus = 1
-            Done(ReturnStatus,Options)        
+            Done(ReturnStatus)        
         if DebugLevel > 9:
             logger.error("Invalid option value,Debug Level range is 0-9, current input level is %d" %args.debug_level)
             ReturnStatus = 1
-            Done(ReturnStatus,Options)
+            Done(ReturnStatus)
         if DebugLevel >= 5 and DebugLevel <= 9:
             Options.Debug = True
         else:
@@ -608,13 +655,13 @@ def ParseCommandLine(Options:OPTIONS):
         if EFI_ERROR(Status):
             logger.error("Invalid option value", "%s = %s" %('--class-code',args.ClassCode))
             ReturnStatus = 1
-            Done(ReturnStatus,Options)
+            Done(ReturnStatus)
             
         ClassCode = TempValue
         if ClassCode & 0xFF000000:
             logger.error("Invalid parameter", "Class code %s out of range!" %args.ClassCod)
-            ReturnStatus = 1
-            Done(ReturnStatus,Options)
+            ReturnStatus = STATUS_ERROR
+            Done(ReturnStatus)
         if FileList != None and FileList.ClassCode == 0:
             FileList.ClassCode = ClassCode
             
@@ -632,13 +679,13 @@ def ParseCommandLine(Options:OPTIONS):
         if EFI_ERROR(Status):
             logger.error("Invalid option value", "%s = %s" %('--Revision',args.Rev))
             ReturnStatus = 1
-            Done(ReturnStatus,Options)
+            Done(ReturnStatus)
             
         CodeRevision = TempValue
         if CodeRevision & 0xFFFF0000:
             logger.error("Invalid parameter", "Code revision %s out of range!" %args.Rev)
             ReturnStatus = 1
-            Done(ReturnStatus,Options)
+            Done(ReturnStatus)
             
         if FileList != None and FileList.CodeRevision == 0:
             FileList.CodeRevision = CodeRevision
@@ -649,43 +696,8 @@ def ParseCommandLine(Options:OPTIONS):
     
     else:#No arguments to be parsed, maybe should be put at the end of the parsing part
         logger.error("Invalid parameter", "Invalid option specified: %s" %sys.argv[0])
-        ReturnStatus = 1
-        Done(ReturnStatus,Options)
-        
-    #End of parsing optional arguments,start to handle the positional arguments inputfile
-    #Not a dash-option argument. Must be a file name. Make sure they're specified -e or -b already~
-    i = 0
-    while args.input:
-        if (FileFlags & (FILE_FLAG_BINARY | FILE_FLAG_EFI)) == 0:
-            logger.error("Invalid parameter, Missing -e or -b with input file %s!" %sys.argv[0])
-            ReturnStatus = 1
-            Done(ReturnStatus,Options)
-            
-        #Check Efi Option RomImage
-        if (FileFlags & FILE_FLAG_EFI) == FILE_FLAG_EFI:
-            EfiRomFlag = True
-        
-        FileList.FileName = args.input[i]
-        FileList.FileFlags = FileFlags
-        FileList.ClassCode = ClassCode
-        FileList.CodeRevision = CodeRevision
-        ClassCode = 0
-        CodeRevision = 0
-        
-        if Options.FileList == None:
-            Options.FileList = FileList
-        else:
-            if PrevFileList == None:
-                PrevFileList = FileList
-            else:
-                PrevFileList.Next = FileList 
-        PrevFileList = FileList
-        
-        i += 1            #暂时考虑这样子来解析不同的文件名
-        if PrevFileList != None:
-            continue
-        else:
-            break
+        ReturnStatus = STATUS_ERROR
+        Done(ReturnStatus)
     
     #Must have specified some files
     if Options.FileList == None:
@@ -698,17 +710,17 @@ def ParseCommandLine(Options:OPTIONS):
         if Options.VendIdValid == 0:
             logger.error("Missing Vendor ID in command line")
             ReturnStatus = STATUS_ERROR
-            Done(ReturnStatus,Options)
+            Done(ReturnStatus)
             
         if Options.DevIdCount == 0:
             logger.error("Missing Device ID in command line")
             ReturnStatus = STATUS_ERROR
-            Done(ReturnStatus,Options)
+            Done(ReturnStatus)
         
     if Options.DevIdCount > 1 and Options.Pci23:
         logger.error("Invalid parameter, PCI 3.0 is required when specifying multiple Device IDs")
         ReturnStatus = STATUS_ERROR
-        Done(ReturnStatus,Options)
+        Done(ReturnStatus)
 
 
 
@@ -904,11 +916,12 @@ def main():
     #FList = FILE_LIST()
     Status  = STATUS_SUCCESS
     if_error = False
-    
+    FileLists = []
     #Parse the command line arguments
-    if ParseCommandLine (mOptions):
+    if ParseCommandLine (mOptions,FileLists):
         return STATUS_ERROR
-
+    
+    mOptions.FileList = FileLists[0]
     #If dumping an image, then do that and quit
     if mOptions.DumpOption == 1:
         if mOptions.FileList != None:
@@ -951,27 +964,27 @@ def main():
             #Ext[ExtAdd:] = DEFAULT_OUTPUT_EXTENSION
             
     #Make sure we don't have the same filename for input and output files
-    FList = mOptions.FileList
-    while FList != None:
+    #FList = mOptions.FileList
+    for FList in FileLists:
         if mOptions.OutFileName == FList.FileName:
             Status = STATUS_ERROR
             logger.error("Invalid input parameter, Input and output file names must be different - %s = %s." %(FList.FileName, mOptions.OutFileName))
             if_error = True
             BailOut(Status,if_error)
-        FList = FList.Next
 
     #Now open our output file
     with open(mOptions.OutFileName,"wb") as FptrOut:
         Data = FptrOut.read()
-        if FptrOut == None:
+        if len(Data) == 0:
             logger.error("Error opening file, Error opening file %s" %mOptions.OutFileName)
             if_error = True
             BailOut(Status,if_error)
 
     #Process all our files
+    i = 0
+    num = len(FileLists)
     TotalSize = 0
-    FList = mOptions.FileList
-    while FList != None:
+    for FList in FileLists:
         Size = 0
         if FList.FileFlags & FILE_FLAG_EFI != 0:
             res = ProcessEfiFile (FptrOut, FList, mOptions.VendId, mOptions.DevIdList[0], Size)
@@ -981,7 +994,7 @@ def main():
                 Status = res[0]
                 Size = res[1]
         elif FList.FileFlags & FILE_FLAG_BINARY !=0:
-            res = ProcessBinFile (FptrOut, FList, Size)
+            res = ProcessBinFile (FptrOut, FList, Size,i,num)
             if type(res) == 'int':
                 Status = res
             else:
@@ -994,7 +1007,7 @@ def main():
             break
         
         TotalSize += Size
-        FList = FList.Next
+        i += 1
 
     #Check total size
     if TotalSize > MAX_OPTION_ROM_SIZE:
