@@ -15,6 +15,26 @@ UTILITY_MAJOR_VERSION = 0
 UTILITY_MINOR_VERSION = 1
 
 
+mFfsFileType = [
+    None,                                      #0x00
+    "EFI_FV_FILETYPE_RAW",                     #0x01
+    "EFI_FV_FILETYPE_FREEFORM",                #0x02
+    "EFI_FV_FILETYPE_SECURITY_CORE",           #0x03
+    "EFI_FV_FILETYPE_PEI_CORE",                #0x04
+    "EFI_FV_FILETYPE_DXE_CORE",                #0x05
+    "EFI_FV_FILETYPE_PEIM",                    #0x06
+    "EFI_FV_FILETYPE_DRIVER",                  #0x07
+    "EFI_FV_FILETYPE_COMBINED_PEIM_DRIVER",    #0x08
+    "EFI_FV_FILETYPE_APPLICATION",             #0x09
+    "EFI_FV_FILETYPE_SMM",                     #0x0A
+    "EFI_FV_FILETYPE_FIRMWARE_VOLUME_IMAGE",   #0x0B
+    "EFI_FV_FILETYPE_COMBINED_SMM_DXE",        #0x0C
+    "EFI_FV_FILETYPE_SMM_CORE",                #0x0D
+    "EFI_FV_FILETYPE_MM_STANDALONE",           #0x0E
+    "EFI_FV_FILETYPE_MM_CORE_STANDALONE"       #0x0F
+]
+
+
 mAlignName=["1", "2", "4", "8", "16", "32", "64", "128", "256", "512",
   "1K", "2K", "4K", "8K", "16K", "32K", "64K", "128K", "256K",
   "512K", "1M", "2M", "4M", "8M", "16M"]
