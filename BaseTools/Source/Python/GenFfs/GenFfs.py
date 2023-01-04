@@ -8,6 +8,7 @@ from FirmwareStorageFormat.SectionHeader import *
 from PeCoff import *
 from BaseTypes import *
 from ParseInf import *
+from FirmwareStorageFormat.FfsFileHeader import *
 import logging
 import sys
 
@@ -45,6 +46,9 @@ mAlignName = ["1", "2", "4", "8", "16", "32", "64", "128", "256", "512",
 mFfsValidAlignName =["8", "16", "128", "512", "1K", "4K", "32K", "64K", "128K","256K",
   "512K", "1M", "2M", "4M", "8M", "16M"]
 
+mFfsValidAlign = [0, 8, 16, 128, 512, 1024, 4096, 32768, 65536, 131072, 262144,
+                   524288, 1048576, 2097152, 4194304, 8388608, 16777216]
+
 mZeroGuid = EFI_GUID(0,0,0(0,0,0,0,0,0,0,0))
 
 mEfiFfsSectionAlignmentPaddingGuid = (0x04132C8D, 0x0A22, 0x4FA8, (0x82, 0x6E, 0x8B, 0xBF, 0xEF, 0xDB, 0x83, 0x6C))
@@ -53,6 +57,8 @@ mEfiFfsSectionAlignmentPaddingGuid = (0x04132C8D, 0x0A22, 0x4FA8, (0x82, 0x6E, 0
 MAX_FFS_SIZE = 0x1000000
 
 #FFS File Attributes.
+FFS_ATTRIB_LARGE_FILE = 0x01
+FFS_ATTRIB_DATA_ALIGNMENT2 = 0x02
 FFS_ATTRIB_FIXED = 0x04
 FFS_ATTRIB_CHECKSUM = 0x40
 
@@ -66,6 +72,12 @@ EFI_FV_FILETYPE_PEIM = 0x06
 EFI_FV_FILETYPE_DRIVER = 0x07
 EFI_FV_FILETYPE_COMBINED_PEIM_DRIVER = 0x08
 EFI_FV_FILETYPE_APPLICATION = 0x09
+
+
+#FFS File State Bits.
+EFI_FILE_HEADER_CONSTRUCTION = 0x01
+EFI_FILE_HEADER_VALID = 0x02
+EFI_FILE_DATA_VALID = 0x04
 
 
 parser=argparse.ArgumentParser(description="This file contains functions required to generate a Firmware File System file.")
@@ -103,7 +115,6 @@ logger = logging.getLogger('GenFfs')
 
 #Converts Align String to align value (1~16M).
 def StringtoAlignment(AlignBuffer:str, AlignNumber:c_uint32) -> int:
-
     #Check AlignBuffer
     if AlignBuffer == None:
         return EFI_INVALID_PARAMETER
@@ -298,6 +309,18 @@ def GetAlignmentFromFile(InFile:str,Alignment:c_uint32) -> int:
     return Status,Alignment
 
 
+def CalculateSum8(Size:int,Buffer=b''):
+    Sum = 0
+    #Perform the byte sum for buffer
+    for Index in range(Size):
+        Sum = Sum + Buffer[Index]
+    return Sum
+
+
+def CalculateChecksum8(Size:int,Buffer=b''):
+    return 0x100 - CalculateSum8 (Buffer, Size)
+
+
 def main():
     Status = EFI_SUCCESS
     FileGuid = EFI_GUID(0,0,0,(0,0,0,0,0,0,0,0))
@@ -435,14 +458,14 @@ def main():
             Status = STATUS_ERROR
             return Status
         
-    if args.verbose:   #Skip Verbose temporarily
-        pass
+    # if args.verbose:   #Skip Verbose temporarily
+    #     pass
             
-    if args.quiet:     #Skip Quiet temporarily
-        pass 
+    # if args.quiet:     #Skip Quiet temporarily
+    #     pass 
     
-    if args.debug:     #Skip Debug temporarily
-        pass 
+    # if args.debug:     #Skip Debug temporarily
+    #     pass 
     
     else:
         logger.error("Unknown option")
@@ -496,14 +519,55 @@ def main():
     #Create Ffs file header.
     FfsFileHeader = EFI_FFS_FILE_HEADER2()
     FfsFileHeader.Name = FileGuid
+    FfsFileHeader.Type = FfsFiletype
     
+    #Update FFS Alignment based on the max alignment required by input section files
+    for Index in range(int(sizeof (mFfsValidAlign) / sizeof (c_uint32) - 1)):
+        if MaxAlignment > mFfsValidAlign [Index] and MaxAlignment <= mFfsValidAlign [Index + 1]:
+            break
+    if FfsAlign < Index:
+        FfsAlign = Index
+        
+    #Now FileSize includes the EFI_FFS_FILE_HEADER
+    if FileSize + sizeof (EFI_FFS_FILE_HEADER) >= MAX_FFS_SIZE:
+        HeaderSize = sizeof (EFI_FFS_FILE_HEADER2)
+        FileSize += sizeof (EFI_FFS_FILE_HEADER2)
+        FfsFileHeader.ExtendedSize = FileSize
+        FfsFileHeader.Size[0] = 0
+        FfsFileHeader.Size[1] = 0
+        FfsFileHeader.Size[2] = 0
+        FfsAttrib |= FFS_ATTRIB_LARGE_FILE
+    else:
+        HeaderSize = sizeof (EFI_FFS_FILE_HEADER)
+        FileSize += sizeof (EFI_FFS_FILE_HEADER)
+        FfsFileHeader.Size[0] = FileSize & 0xFF
+        FfsFileHeader.Size[1] = (FileSize & 0xFF00) >> 8
+        FfsFileHeader.Size[2] = (FileSize & 0xFF0000) >> 16
+        
+    #FfsAlign larger than 7,set FFS_ATTRIB_DATA_ALIGNMENT2
+    if FfsAlign < 8:
+        FfsFileHeader.Attributes = FfsAttrib | (FfsAlign << 3)
+    else:
+        FfsFileHeader.Attributes = FfsAttrib | ((FfsAlign & 0x7) << 3) | FFS_ATTRIB_DATA_ALIGNMENT2
+        
+    #Fill in checksums and state,these must be zero for checksumming
+    FfsFileHeader.IntegrityCheck.Checksum.Header = CalculateChecksum8(HeaderSize,struct2stream(FfsFileHeader))
     
+    if FfsFileHeader.Attributes & FFS_ATTRIB_CHECKSUM:
+        #Ffs header checksum = zero, so only need to calculate ffs body.
+        FfsFileHeader.IntegrityCheck.Checksum.File = CalculateChecksum8(FileSize - HeaderSize,FileBuffer)
+    else:
+        FfsFileHeader.State = EFI_FILE_HEADER_CONSTRUCTION | EFI_FILE_HEADER_VALID | EFI_FILE_DATA_VALID
     
-    
-    
-    
-    
-    
+    #Open output file to write ffs data
+    with open("OutputFileName","wb") as FfsFile:
+        if FfsFile == None:
+            logger.error("Error opening file:%s" %OutputFileName)
+            Status = STATUS_ERROR
+            return Status
+        FfsFile.write(struct2stream(FfsFileHeader))      #Write header
+        if FileBuffer != None:
+            FfsFile.write(FileBuffer)                        #Write data
     
     
 if __name__=="__main__":
