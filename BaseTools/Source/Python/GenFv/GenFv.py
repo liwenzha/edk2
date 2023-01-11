@@ -17,12 +17,21 @@ UTILITY_MINOR_VERSION = 1
 CAPSULE_FLAGS_PERSIST_ACROSS_RESET = 0x00010000
 CAPSULE_FLAGS_POPULATE_SYSTEM_TABLE = 0x00020000
 CAPSULE_FLAGS_INITIATE_RESET = 0x00040000
+
 EFI_GUID_STRING = "EFI_GUID"
 FV_BASE_ADDRESS_STRING = "[FV_BASE_ADDRESS]"
+OPTIONS_SECTION_STRING = "[options]"
+EFI_CAPSULE_GUID_STRING = "EFI_CAPSULE_GUID"
+EFI_CAPSULE_HEADER_SIZE_STRING = "EFI_CAPSULE_HEADER_SIZE"
+EFI_CAPSULE_FLAGS_STRING = "EFI_CAPSULE_FLAGS"
+
 mFvBaseAddress = [0]*0x10
 
 mEfiFirmwareFileSystem2Guid = EFI_GUID(0x8c8ce578, 0x8a3d, 0x4f1c, (0x99, 0x35, 0x89, 0x61, 0x85, 0xc3, 0x2d, 0xd3 ))
 mEfiFirmwareFileSystem3Guid = EFI_GUID(0x5473c07a, 0x3dcb, 0x4dca, (0xbd, 0x6f, 0x1e, 0x96, 0x89, 0xe7, 0x34, 0x9a ))
+mZeroGuid = EFI_GUID(0,0,0,(0,0,0,0,0,0,0,0))
+mDefaultCapsuleGuid = EFI_GUID(0x3B6686BD, 0x0D76, 0x4030, (0xB7, 0x0E, 0xB5, 0x51, 0x9E, 0x2F, 0xC5, 0xA0))
+
 mCapDataInfo = CAP_INFO()
 
 STATUS_ERROR = 2
@@ -93,15 +102,55 @@ def GetFileImage(InputFileName:str,InputFileImage:bytes,BytesRead:c_uint32):
     return Status,InputFileImage,BytesRead
 
 
+#This function parses a Cap.INF file and copies info into a CAP_INFO structure.
+def ParseCapInf(InfFile:MEMORY_FILE,CapInfo:CAP_INFO):
+    Value = ''
+    Value64 = 0
+    Status = FindToken (InfFile, OPTIONS_SECTION_STRING, EFI_CAPSULE_GUID_STRING, 0, Value)
+    if Status == EFI_SUCCESS:
+        #Get the Capsule Guid
+        res = StringToGuid(Value,CapInfo.CapGuid)
+        if type(res) == 'int':
+            Status = res
+        else:
+            Status = res[0]
+            CapInfo.CapGuid = res[1]
+        if EFI_ERROR(Status):
+            logger.error("Invalid parameter, %s = %s" %(EFI_CAPSULE_GUID_STRING, Value))
+            return EFI_ABORTED
+        
+    #Read the Capsule Header Size
+    Status = FindToken (InfFile, OPTIONS_SECTION_STRING, EFI_CAPSULE_HEADER_SIZE_STRING, 0, Value);
+    if Status == EFI_SUCCESS:
+        res = AsciiStringToUint64(Value, False, Value64)
+        if type(res) == 'int':
+            Status = res
+        else:
+            Status = res[0]
+            Value64 = res[1]
+        if EFI_ERROR(Status):
+            logger.error("Invalid parameter, %s = %s" %(EFI_CAPSULE_HEADER_SIZE_STRING, Value))
+            return EFI_ABORTED
+        CapInfo.HeaderSize = Value64
+
+    #Read the Capsule Flag
+    Status = FindToken (InfFile, OPTIONS_SECTION_STRING, EFI_CAPSULE_FLAGS_STRING, 0, Value)
+    
+
+
+
+
+
+
 #This is the main function which will be called from application to create UEFI Capsule image.
-def GenerateCapImage(InfFileImage:bytes,InfFileSize:c_uint64,CapFileName:c_char):
+def GenerateCapImage(InfFileImage:bytes,InfFileSize:c_uint64,CapFileName:str):
     InfMemoryFile = MEMORY_FILE()
     Status = STATUS_ERROR
     
     if InfFileImage != None:
-        InfMemoryFile.FileImage           = InfFileImage
-        InfMemoryFile.CurrentFilePointer  = InfFileImage
-        InfMemoryFile.Eof                 = InfFileImage + InfFileSize
+        InfMemoryFile.FileImage           = InfFileImage.decode()
+        InfMemoryFile.CurrentFilePointer  = InfFileImage.decode()
+        InfMemoryFile.Eof                 = InfFileImage[InfFileSize:].decode()
 
     #Parse the Cap inf file for header information
     res = ParseCapInf(InfMemoryFile, mCapDataInfo)
@@ -113,6 +162,63 @@ def GenerateCapImage(InfFileImage:bytes,InfFileSize:c_uint64,CapFileName:c_char)
         mCapDataInfo.HeaderSize = sizeof (EFI_CAPSULE_HEADER)
         mCapDataInfo.HeaderSize = (mCapDataInfo.HeaderSize + 0xF) & ~0xF
         
+    if mCapDataInfo.HeaderSize < sizeof (EFI_CAPSULE_HEADER):
+        logger.error("Invalid parameter, The specified HeaderSize cannot be less than the size of EFI_CAPSULE_HEADER.")
+        return EFI_INVALID_PARAMETER
+    
+    if CapFileName == None and mCapDataInfo.CapName[0] != '\0':
+        CapFileName = mCapDataInfo.CapName
+        
+    if CapFileName == None:
+        logger.error("Missing required argument, Output Capsule file name")
+        return EFI_INVALID_PARAMETER
+        
+    #Set Default Capsule Guid value
+    if CompareGuid (mCapDataInfo.CapGuid, mZeroGuid) == 0:
+        mCapDataInfo.CapGuid = mDefaultCapsuleGuid
+        
+    #Calculate the size of capsule image.
+    Index = 0
+    CapSize = mCapDataInfo.HeaderSize
+    while mCapDataInfo.CapFiles [Index][0] != '\0':
+        with open(mCapDataInfo.CapFiles[Index],"rb") as fpin:
+            if fpin == None:
+                logger.error("Error opening file:%s" %mCapDataInfo.CapFiles[Index])
+                return EFI_ABORTED
+            Data = fpin.read()
+            FileSize = len(Data)
+            CapSize  += FileSize
+        Index += 1
+        
+    #create capsule header and get capsule body
+    CapBuffer = b''
+    CapsuleHeader = EFI_CAPSULE_HEADER()
+    CapsuleHeader.HeaderSize = mCapDataInfo.HeaderSize
+    CapsuleHeader.Flags = mCapDataInfo.Flags
+    CapsuleHeader.CapsuleImageSize = CapSize
+    
+    Index    = 0
+    FileSize = 0
+    CapSize  = CapsuleHeader.HeaderSize
+    while mCapDataInfo.CapFiles [Index][0] != '\0':
+        with open(mCapDataInfo.CapFiles[Index],"rb") as fpin:
+            if fpin == None:
+                logger.error("Error opening file:%s" %mCapDataInfo.CapFiles[Index])
+                return EFI_ABORTED
+            Data = fpin.read()
+            FileSize = len(Data)
+            CapBuffer = struct2stream(CapsuleHeader) + Data
+        Index += 1
+        CapSize  += FileSize
+        
+    #Write capsule data into the outputfile
+    with open(CapFileName,"wb") as fpout:
+        if fpout == None:
+            logger.error("Error opening file:%s" %CapFileName)
+            return EFI_ABORTED
+        fpout.write(CapBuffer)
+    Status = EFI_SUCCESS
+    return Status
         
 
 def main():
@@ -399,7 +505,7 @@ def main():
             mCapDataInfo.CapFiles[Index] = mFvDataInfo.FvFiles[Index]
             Index += 1
         Status = GenerateCapImage(InfFileImage,InfFileSize,OutFileName)
-    
+        
     else:
         # Will take rebase action at below situation:
         # 1. ForceRebase Flag specified to TRUE;

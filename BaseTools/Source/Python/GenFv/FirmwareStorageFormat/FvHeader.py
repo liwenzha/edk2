@@ -50,12 +50,12 @@ class FV_INFO(Structure):
         ('FvFileSystemGuidSet',bool),
         ('FvNameGuid',EFI_GUID),
         ('FvNameGuidSet',bool),
-        ('FvExtHeaderFile',ARRAY(c_char,MAX_LONG_FILE_PATH)),
+        ('FvExtHeaderFile',ARRAY(c_byte,MAX_LONG_FILE_PATH)),
         ('Size',c_uint64),
         ('FvAttributes',c_uint32),
         ('FvName',ARRAY(c_char,MAX_LONG_FILE_PATH)),
         ('FvBlocks',ARRAY(EFI_FV_BLOCK_MAP_ENTRY,MAX_NUMBER_OF_FV_BLOCKS)),
-        ('FvFiles',ARRAY(ARRAY(c_char,MAX_NUMBER_OF_FILES_IN_FV),MAX_LONG_FILE_PATH)),
+        ('FvFiles',ARRAY(ARRAY(c_byte,MAX_NUMBER_OF_FILES_IN_FV),MAX_LONG_FILE_PATH)),
         ('SizeofFvFiles',ARRAY(c_uint32,MAX_NUMBER_OF_FILES_IN_FV)),
         ('IsPiFvImage',bool),
         ('ForceRebase',c_int8),
@@ -69,17 +69,17 @@ class CAP_INFO(Structure):
         ('CapGuid',EFI_GUID),
         ('HeaderSize',c_uint32),
         ('Flags',c_uint32),
-        ('CapName',ARRAY(c_char,MAX_LONG_FILE_PATH)),
-        ('CapFiles',ARRAY(ARRAY(c_char,MAX_NUMBER_OF_FILES_IN_CAP),MAX_LONG_FILE_PATH)),
+        ('CapName',ARRAY(c_byte,MAX_LONG_FILE_PATH)),
+        ('CapFiles',ARRAY(ARRAY(c_byte,MAX_NUMBER_OF_FILES_IN_CAP),MAX_LONG_FILE_PATH)),
     ]
 
 
 class MEMORY_FILE(Structure):
     _pack_ = 1
     _fields_ = [
-        ('FileImage',c_char),
-        ('Eof',c_char),
-        ('CurrentFilePointer',c_char),
+        ('FileImage',c_wchar_p),
+        ('Eof',c_wchar_p),
+        ('CurrentFilePointer',c_wchar_p),
     ]
 
 
