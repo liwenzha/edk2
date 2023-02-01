@@ -64,7 +64,7 @@ def main():
     MAXIMUM_INPUT_FILE_NUM = 10
     InputFileNum = 0
     InputFileName = []
-    InputFileAlign = [0] * MAXIMUM_INPUT_FILE_NUM
+    InputFileAlign = []
     InputLength = 0
     OutFileBuffer = b''
     StringBuffer = ''
@@ -187,12 +187,13 @@ def main():
         
     #Section File alignment requirement
     if args.SectionAlign:
-        # if InputFileAlignNum == 0:
-        #     for i in range(MAXIMUM_INPUT_FILE_NUM):
-        #         InputFileAlign.append(1)
-        # elif InputFileAlignNum % MAXIMUM_INPUT_FILE_NUM == 0:
-        #     for i in range(InputFileNum,InputFileNum + MAXIMUM_INPUT_FILE_NUM,1):
-        #         InputFileAlign.append(1)
+        if InputFileAlignNum == 0:
+            for i in range(MAXIMUM_INPUT_FILE_NUM):
+                InputFileAlign.append(1)
+        elif InputFileAlignNum % MAXIMUM_INPUT_FILE_NUM == 0:
+            for i in range(InputFileNum,InputFileNum + MAXIMUM_INPUT_FILE_NUM,1):
+                InputFileAlign.append(1)
+
         temp = args.SectionAlign
         for ch in temp:
             if ch == "0":
@@ -435,7 +436,6 @@ def main():
                 Status = res[0]
                 OutFileBuffer = res[1]
                 InputLength = res[2]
-        print('called')
             
     else:
         #All other section types are caught by default(they're all the same)

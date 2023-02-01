@@ -200,7 +200,7 @@ def GetSectionContents(InputFileNum:c_uint32,BufferLength:c_uint32,InputFileName
         FileSize = len(Data)
     
         #Adjust section buffer when section alignment is required.
-        if InputFileAlign != None:
+        if len(InputFileAlign) != 0:
             
             #Check this section is Te/Pe section, and Calculate the numbers of Te/Pe section.
             TeOffset = 0
@@ -249,6 +249,7 @@ def GetSectionContents(InputFileNum:c_uint32,BufferLength:c_uint32,InputFileName
                     # while Offset1 > 0: 
                     #     FileBuffer = FileBuffer + b'\0'
                     #     Offset1 -= 1
+                    #FileBuffer = FileBuffer.replace(FileBuffer[Size:Size + Offset],b'\0'*Offset)
 
                     SectHeader = EFI_COMMON_SECTION_HEADER()
                     SectHeader.Type = EFI_SECTION_RAW
