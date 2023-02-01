@@ -167,7 +167,7 @@ def StringtoAlignment(AlignBuffer:str, AlignNumber:c_uint32) -> int:
 
 #Get the contents of all section files specified in InputFileName into FileBuffer
 def GetSectionContents(InputFileNum:c_uint32,BufferLength:c_uint32,InputFileName=[],InputFileAlign=[],
-                        FileBuffer=b'',):
+                        FileBuffer=b''):
     
     logger=logging.getLogger('GenSec')
     
@@ -183,7 +183,7 @@ def GetSectionContents(InputFileNum:c_uint32,BufferLength:c_uint32,InputFileName
     TeOffset = 0
     
 
-    #Go through array of file names and copy their contents
+    #Go through array of file names and copy their contents to the output buffer
     for Index in range(InputFileNum):
         #Make sure section ends on a DWORD boundary
         while Size & 0x03 != 0:
@@ -242,24 +242,26 @@ def GetSectionContents(InputFileNum:c_uint32,BufferLength:c_uint32,InputFileName
             if (InputFileAlign[Index] != 0 and (Size + HeaderSize + TeOffset) % InputFileAlign[Index]) != 0:
                 Offset = (Size + sizeof(EFI_COMMON_SECTION_HEADER)+ HeaderSize + TeOffset + InputFileAlign[Index] - 1) & ~ (InputFileAlign [Index] - 1)
                 Offset = Offset - Size - HeaderSize - TeOffset
-                #Offset1 = Offset
+                # Offset1 = Offset
 
                 #The maximal alignment is 64K, the raw section size must be less than 0xffffff
                 if FileBuffer != None and ((Size + Offset) < BufferLength):
-                    # while Offset1 > 0:
-                    #     FileBuffer = FileBuffer + b'0'
+                    # while Offset1 > 0: 
+                    #     FileBuffer = FileBuffer + b'\0'
                     #     Offset1 -= 1
+
                     SectHeader = EFI_COMMON_SECTION_HEADER()
                     SectHeader.Type = EFI_SECTION_RAW
                     SectHeader.SET_SECTION_SIZE(Offset)
                     #FileBuffer = FileBuffer.replace(FileBuffer[Size:Size + sizeof(EFI_COMMON_SECTION_HEADER)],struct2stream(SectHeader))
-                    FileBuffer = struct2stream(SectHeader)
+                    FileBuffer = FileBuffer + struct2stream(SectHeader)
                 Size = Size + Offset
             
         #Now read the contents of the file into the buffer
         #Buffer must be enough to contain the file content.
         if FileSize > 0 and FileBuffer != None and ((Size + FileSize) <= BufferLength):
             FileBuffer = FileBuffer + Data
+            #FileBuffer = FileBuffer.replace(FileBuffer[Size:(Size + FileSize)],Data)
             if len(FileBuffer) == 0:
                 return EFI_ABORTED
         Size += FileSize
@@ -348,7 +350,7 @@ def GenSectionCompressionSection(InputFileNum:c_uint32,SectCompSubType:c_uint8,I
             if CompressedLength + HeaderLength >= MAX_SECTION_SIZE:
                 HeaderLength = sizeof(EFI_COMPRESSION_SECTION2)
             TotalLength = CompressedLength + HeaderLength
-            OutputBuffer = b'\0' * TotalLength
+            # OutputBuffer = b'\0' * TotalLength
             res = CompressFunction(InputLength,CompressedLength,FileBuffer,OutputBuffer)
             if type(res) == 'int':
                 Status = res
@@ -605,9 +607,10 @@ def FfsRebaseImageRead(FileOffset:c_uint64,ReadSize:c_uint32,FileHandle = b'',Bu
 
 #InFile is input file for getting alignment
 #return the alignment
-def GetAlignmentFromFile(InFile:str,Alignment:c_uint32) -> int:
+def GetAlignmentFromFile(InFile:str,Alignment:c_uint32):
 
     PeFileBuffer = b''
+    Alignment = 0
     
     with open(InFile,'rb') as InFileHandle:
         if InFileHandle == None:
@@ -621,7 +624,8 @@ def GetAlignmentFromFile(InFile:str,Alignment:c_uint32) -> int:
     CurSecHdrSize = sizeof(CommonHeader)
     
     ImageContext = PE_COFF_LOADER_IMAGE_CONTEXT()
-    ImageContext.Handle =  PeFileBuffer[CurSecHdrSize:CurSecHdrSize + sizeof(c_uint64)]
+    #ImageContext.Handle =  PeFileBuffer[CurSecHdrSize:CurSecHdrSize + sizeof(c_uint64)]
+    ImageContext.Handle =  int.from_bytes(PeFileBuffer[CurSecHdrSize:CurSecHdrSize + sizeof(c_uint64)],byteorder='little', signed=False)
     ImageContext.ImageRead = FfsRebaseImageRead
     Status = PeCoffLoaderGetImageInfo(ImageContext)
     if EFI_ERROR(Status):

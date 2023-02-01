@@ -196,7 +196,7 @@ class PE_COFF_LOADER_IMAGE_CONTEXT(Structure):
                ('PeCoffHeaderOffset',c_uint32),
                ('DebugDirectoryEntryRva',c_uint32),
                ('CodeView',c_void_p),
-               ('PdbPointer',c_char),
+               ('PdbPointer',c_char_p),
                ('SizeOfHeaders',c_uint64),
                ('ImageCodeMemoryType',c_uint32),
                ('ImageDataMemoryType',c_uint32),

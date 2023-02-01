@@ -24,7 +24,7 @@ UTILITY_MINOR_VERSION = 1
 
 
 parser=argparse.ArgumentParser(description="Create Firmware File Section files  per PI Spec")
-parser.add_argument("input",help = "Input file name")
+parser.add_argument("input",help = "Input file name",nargs = '+')
 parser.add_argument("-o","--outputfile",dest="output",help="File is the SectionFile to be created.")
 parser.add_argument("-s","--sectiontype",dest="SectionType",help="SectionType defined in PI spec is one type of\
                     EFI_SECTION_COMPRESSION, EFI_SECTION_GUID_DEFINED,EFI_SECTION_PE32, \
@@ -43,7 +43,7 @@ parser.add_argument("-r","--attributes",dest="GuidAttr",help="GuidAttr is guid s
 parser.add_argument("-n","--name",dest="String",help="String is a NULL terminated string used in Ui section.")
 parser.add_argument("-j","--buildnumber",dest="Number",help=" Number is an integer value between 0 and 65535\
                     used in Ver section.")
-parser.add_argument("--sectionalign",dest="SectionAlign",help="SectionAlign points to section alignment, which support\
+parser.add_argument("--sectionalign",dest="SectionAlign",action = 'append',help="SectionAlign points to section alignment, which support\
                     the alignment scope 0~16M. If SectionAlign is specified\
                     as 0, tool get alignment value from SectionFile. It is\
                     specified in same order that the section file is input.")
@@ -63,8 +63,8 @@ def main():
     InputFileAlignNum = 0
     MAXIMUM_INPUT_FILE_NUM = 10
     InputFileNum = 0
-    InputFileName = ['0']*100
-    InputFileAlign = [0]*100
+    InputFileName = []
+    InputFileAlign = [0] * MAXIMUM_INPUT_FILE_NUM
     InputLength = 0
     OutFileBuffer = b''
     StringBuffer = ''
@@ -192,25 +192,28 @@ def main():
         #         InputFileAlign.append(1)
         # elif InputFileAlignNum % MAXIMUM_INPUT_FILE_NUM == 0:
         #     for i in range(InputFileNum,InputFileNum + MAXIMUM_INPUT_FILE_NUM,1):
-        #         InputFileAlign[i] = 0
-
-        if args.SectionAlign == "0":
-            InputFileAlign[InputFileAlignNum] = 0
-            #InputFileAlign.append(0)
-        else:
-            res = StringtoAlignment(args.SectionAlign,InputFileAlign[InputFileAlignNum])
-            if type(res) == 'int':
-                Status = res
+        #         InputFileAlign.append(1)
+        temp = args.SectionAlign
+        for ch in temp:
+            if ch == "0":
+                InputFileAlign[InputFileAlignNum] = 0
+                #InputFileAlign.append(0)
             else:
-                Status = res[0]
-                InputFileAlign[InputFileAlignNum] = res[1]
-                
-            if EFI_ERROR (Status):
-                logger.error("Invalid option value")
-                return STATUS_ERROR
-        InputFileAlignNum += 1
+                res = StringtoAlignment(ch,InputFileAlign[InputFileAlignNum])
+                if type(res) == 'int':
+                    Status = res
+                else:
+                    Status = res[0]
+                    InputFileAlign[InputFileAlignNum] = res[1]
+                    #InputFileAlign.append(res[1])
+                    if EFI_ERROR (Status):
+                        logger.error("Invalid option value")
+                        return STATUS_ERROR
+            InputFileAlignNum += 1
 
-    #Get input file name
+
+
+    #Get Input file name
     # if InputFileNum == 0 and len(InputFileName) == 0:
     #     for i in range(MAXIMUM_INPUT_FILE_NUM):
     #         InputFileName.append('0') 
@@ -220,11 +223,13 @@ def main():
     #         InputFileName[i] = '0'
             
     # for i in range(InputFileNum):
+    
     if args.input:
-        InputFileName[InputFileNum] = args.input
-        #InputFileName.append(args.input)
-        InputFileNum += 1
-
+        #InputFileName[InputFileNum] = args.input
+        temp = []
+        temp.append(args.input)
+        InputFileName = temp[0]
+        InputFileNum = len(InputFileName)
     
     if InputFileAlignNum > 0 and InputFileAlignNum != InputFileNum:
         logger.error("Invalid option, section alignment must be set for each section")
@@ -237,7 +242,6 @@ def main():
             else:
                 Status =res[0]
                 InputFileAlign[Index] = res[1]
-                
             if EFI_ERROR(Status):
                 logger.error("Fail to get Alignment from %s",InputFileName[InputFileNum])
                 return STATUS_ERROR
@@ -423,6 +427,7 @@ def main():
             InputLength = res[2]
             
         if Status == EFI_BUFFER_TOO_SMALL:
+            #OutFileBuffer = b'\0'* InputLength
             res = GetSectionContents(InputFileNum,InputLength,InputFileName,InputFileAlign,OutFileBuffer)
             if type(res) == 'int':
                 Status = res
@@ -430,6 +435,7 @@ def main():
                 Status = res[0]
                 OutFileBuffer = res[1]
                 InputLength = res[2]
+        print('called')
             
     else:
         #All other section types are caught by default(they're all the same)
