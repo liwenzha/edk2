@@ -592,8 +592,9 @@ def GenSectionSubtypeGuidSection(InputFileNum:c_uint32,SubTypeGuid:EFI_GUID,
 
 
 #Support routine for th PE/COFF file Loader that reads a buffer from a PE/COFF file
-def FfsRebaseImageRead(FileOffset:c_uint64,ReadSize:c_uint32,FileHandle = b'',Buffer = b'') -> int:
+def FfsRebaseImageRead(FileOffset:c_uint64,ReadSize:c_uint32,FileHandle:str,Buffer = b''):
     Destination8 = Buffer
+    FileHandle = FileHandle.encode()
     Source8 = FileHandle[FileOffset:]
     Length = ReadSize
     # while Length - 1:
@@ -601,9 +602,10 @@ def FfsRebaseImageRead(FileOffset:c_uint64,ReadSize:c_uint32,FileHandle = b'',Bu
     #     Destination8 += 1
     #     Source8 += 1
     #     #Length -= 1
-    Destination8 += Source8[0:Length]
+    #Destination8 += Source8[0:Length]
+    Destination8 =  Destination8.replace(Destination8[0:Length],Source8[0:Length])
     Status = EFI_SUCCESS
-    return Status,ReadSize,Buffer
+    return Status,ReadSize,Destination8
 
 
 #InFile is input file for getting alignment
@@ -626,8 +628,10 @@ def GetAlignmentFromFile(InFile:str,Alignment:c_uint32):
     
     ImageContext = PE_COFF_LOADER_IMAGE_CONTEXT()
     #ImageContext.Handle =  PeFileBuffer[CurSecHdrSize:CurSecHdrSize + sizeof(c_uint64)]
-    ImageContext.Handle =  int.from_bytes(PeFileBuffer[CurSecHdrSize:CurSecHdrSize + sizeof(c_uint64)],byteorder='little', signed=False)
-    ImageContext.ImageRead = FfsRebaseImageRead
+    ImageContext.Handle =  PeFileBuffer[CurSecHdrSize:CurSecHdrSize + sizeof(c_uint64)].decode()
+    
+    #For future use in PeCoffLoaderGetImageInfo like EfiCompress
+    #ImageContext.ImageRead = FfsRebaseImageRead[0]
     Status = PeCoffLoaderGetImageInfo(ImageContext)
     if EFI_ERROR(Status):
         logger.error("Invalid PeImage,he input file is %s and return status is %x",InFile,Status)

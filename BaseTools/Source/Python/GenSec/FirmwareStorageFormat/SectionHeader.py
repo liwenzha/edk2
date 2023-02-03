@@ -175,12 +175,12 @@ class EFI_TE_IMAGE_HEADER(Structure):
         return 40
 
 
-class PE_COFF_LOADER_READ_FILE(Structure):
-    _pack_=  1
-    _fields_ =[('FileOffset',c_uint64),
-               ('ReadSize',c_uint64),
-               ('FileHandle',c_void_p),
-               ('Buffer',c_void_p)]
+# class PE_COFF_LOADER_READ_FILE(Structure):
+#     _pack_=  1
+#     _fields_ =[('FileOffset',c_uint64),
+#                ('ReadSize',c_uint64),
+#                ('FileHandle',c_void_p),
+#                ('Buffer',c_void_p)]
 
 
 class PE_COFF_LOADER_IMAGE_CONTEXT(Structure):
@@ -189,8 +189,8 @@ class PE_COFF_LOADER_IMAGE_CONTEXT(Structure):
                ('ImageSize',c_uint64),
                ('DestinationAddress',PHYSICAL_ADDRESS),
                ('EntryPoint',PHYSICAL_ADDRESS),
-               ('ImageRead',PE_COFF_LOADER_READ_FILE),
-               ('Handle',c_void_p),
+               ('ImageRead',c_int),
+               ('Handle',c_wchar_p),
                ('FixupData',c_void_p),
                ('SectionAlignment',c_uint32),
                ('PeCoffHeaderOffset',c_uint32),
