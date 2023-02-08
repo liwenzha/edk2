@@ -21,62 +21,39 @@ import copy
 UTILITY_NAME = 'GenSec'
 UTILITY_MAJOR_VERSION = 0
 UTILITY_MINOR_VERSION = 1
-__BUILD_VERSION = "Developer Build based on Revision: Unknown"
 
-def Version():
-    print("%s Version %d.%d %s" %(UTILITY_NAME, UTILITY_MAJOR_VERSION, UTILITY_MINOR_VERSION,__BUILD_VERSION))
 
-def Usage():
-    print("Copyright (c) 2007 - 2018, Intel Corporation. All rights reserved.")
-    print("Create Firmware File Section files  per PI Spec")
-    print("Usage: %s [options] [input_file]" %UTILITY_NAME)
-    
-    #Details Option
-    print("Options:")
-    print("  -o FileName, --outputfile FileName\n\
-                        File is the SectionFile to be created.")
-    print("  -s [SectionType], --sectiontype[SectionType]\n\
-                        SectionType defined in PI spec is one type of\n\
-                        EFI_SECTION_COMPRESSION, EFI_SECTION_GUID_DEFINED,\n\
-                        EFI_SECTION_PE32,EFI_SECTION_PIC, EFI_SECTION_TE,\n\
-                        EFI_SECTION_DXE_DEPEX, EFI_SECTION_COMPATIBILITY16,\n\
-                        EFI_SECTION_USER_INTERFACE, EFI_SECTION_VERSION,\n\
-                        EFI_SECTION_FIRMWARE_VOLUME_IMAGE,EFI_SECTION_RAW,\n\
-                        EFI_SECTION_FREEFORM_SUBTYPE_GUID,\n\
-                        EFI_SECTION_PEI_DEPEX, EFI_SECTION_SMM_DEPEX.\n\
-                        if -s option is not given,\n\
-                        EFI_SECTION_ALL is default section type.")
-    print("  -c [Type], --compress [Type]\n\
-                        Compress method type can be PI_NONE or PI_STD.\n\
-                        if -c option is not given, PI_STD is default type.")
-    print("  -g GuidValue, --vendor GuidValue\n\
-                        GuidValue is one specific vendor guid value.\n\
-                        Its format is xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx")
-    print("  -l GuidHeaderLength, --HeaderLength GuidHeaderLength\n\
-                        GuidHeaderLength is the size of header of guided data")
-    print("  -r GuidAttr, --attributes GuidAttr\n\
-                        GuidAttr is guid section attributes, which may be\n\
-                        PROCESSING_REQUIRED, AUTH_STATUS_VALID and NONE.\n\
-                        if -r option is not given, default PROCESSING_REQUIRED")
-    print("  -n String, --name String\n\
-                        String is a NULL terminated string used in Ui section.")
-    print("  -j Number, --buildnumber Number\n\
-                        Number is an integer value between 0 and 65535\n\
-                        used in Ver section.")
-    print("  --sectionalign SectionAlign\n\
-                        SectionAlign points to section alignment, which support\n\
-                        the alignment scope 0~16M. If SectionAlign is specified\n\
-                        as 0, tool get alignment value from SectionFile. It is\n\
-                        specified in same order that the section file is input.")
-    print("  --dummy dummyfile\n\
-                        compare dummyfile with input_file to decide whether\n\
-                        need to set PROCESSING_REQUIRED attribute.")
-    print("  -v, --verbose         Turn on verbose output with informational messages.")
-    print("  -q, --quiet           Disable all messages except key message and fatal error")
-    print("  -d, --debug           level  Enable debug messages, at input debug level.")
-    print("  --version             Show program's version number and exit.")
-    print("  -h, --help            Show program's version number and exit.")
-
+parser=argparse.ArgumentParser(description="Create Firmware File Section files  per PI Spec")
+parser.add_argument("input",help = "Input file name",nargs = '+')
+parser.add_argument("-o","--outputfile",dest="output",help="File is the SectionFile to be created.")
+parser.add_argument("-s","--sectiontype",dest="SectionType",help="SectionType defined in PI spec is one type of\
+                    EFI_SECTION_COMPRESSION, EFI_SECTION_GUID_DEFINED,EFI_SECTION_PE32, \
+                    EFI_SECTION_PIC, EFI_SECTION_TE,EFI_SECTION_DXE_DEPEX, EFI_SECTION_COMPATIBILITY16,\
+                    EFI_SECTION_USER_INTERFACE, EFI_SECTION_VERSION,EFI_SECTION_FIRMWARE_VOLUME_IMAGE, EFI_SECTION_RAW,\
+                    EFI_SECTION_FREEFORM_SUBTYPE_GUID,EFI_SECTION_PEI_DEPEX, EFI_SECTION_SMM_DEPEX. if -s option is not given,\
+                    EFI_SECTION_ALL is default section type.")
+parser.add_argument("-c","--compress",dest="Compress",help="Compress method type can be PI_NONE or PI_STD.\
+                    if -c option is not given, PI_STD is default type.")
+parser.add_argument("-g","--vendor",dest="GuidValue",help="GuidValue is one specific vendor guid value.\
+                    Its format is xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx")
+parser.add_argument("-l","--HeaderLength",dest="GuidHeaderLength",help="GuidHeaderLength is the size of header of guided data")
+parser.add_argument("-r","--attributes",dest="GuidAttr",help="GuidAttr is guid section attributes, which may be\
+                    PROCESSING_REQUIRED, AUTH_STATUS_VALID and NONE.\
+                    if -r option is not given, default PROCESSING_REQUIRED")
+parser.add_argument("-n","--name",dest="String",help="String is a NULL terminated string used in Ui section.")
+parser.add_argument("-j","--buildnumber",dest="Number",help=" Number is an integer value between 0 and 65535\
+                    used in Ver section.")
+parser.add_argument("--sectionalign",dest="SectionAlign",action = 'append',help="SectionAlign points to section alignment, which support\
+                    the alignment scope 0~16M. If SectionAlign is specified\
+                    as 0, tool get alignment value from SectionFile. It is\
+                    specified in same order that the section file is input.")
+parser.add_argument("--dummy",dest="dummyfile",help="compare dummyfile with input_file to decide whether\
+                    need to set PROCESSING_REQUIRED attribute.")
+parser.add_argument("-v","--verbose",dest="verbose",help="Turn on verbose output with informational messages.")
+parser.add_argument("-q","--quiet",dest="quiet",help="Disable all messages except key message and fatal error")
+parser.add_argument("-d","--debug",dest="debug_level",help="Enable debug messages, at input debug level.")
+parser.add_argument("--version", action="version", version='%s Version %d.%d'%(UTILITY_NAME,UTILITY_MINOR_VERSION,UTILITY_MAJOR_VERSION),
+                    help="Show program's version number and exit.")
         
 
 #Main function
@@ -90,7 +67,6 @@ def main():
     InputFileAlign = []
     InputLength = 0
     OutFileBuffer = b''
-    OutputFileName = ''
     StringBuffer = ''
     # VendorGuid = mZeroGuid
     VendorGuid = copy.deepcopy(mZeroGuid)
@@ -101,185 +77,130 @@ def main():
     SectionName = None
     VersionNumber = 0
     
-    #args = parser.parse_args()
-    logger=logging.getLogger('GenSec')
-    
+    args = parser.parse_args()
     argc = len(sys.argv)
+    
+    logger=logging.getLogger('GenSec')
+    if args.quiet:
+        logger.setLevel(logging.CRITICAL)
+    if args.verbose:
+        logger.setLevel(logging.DEBUG)
+    lh = logging.StreamHandler(sys.stdout)
+    lf = logging.Formatter("%(levelname)-8s: %(message)s")
+    lh.setFormatter(lf)
+    logger.addHandler(lh)
+    
     if argc == 1:
-            logger.error("Missing options,No options input")
-            print('\n')
-            Usage()
+        parser.print_help()
+        logger.error("Missing options")
+        return STATUS_ERROR
+    
+    #Parse command line
+    if args.SectionType:
+        SectionName = args.SectionType
+        if SectionName == None:
+            logger.error("Invalid option value, Section Type can't be NULL")
             return STATUS_ERROR
-
-    #Start to parse command line without using argparse...
-    argc -= 1
-    arg_index = 1
+            
+    if args.output:
+        OutputFileName = args.output
+        if OutputFileName == None:
+            logger.error("Invalid option value, Output file can't be NULL")
+            return STATUS_ERROR
+            
+    if args.Compress:
+        CompressionName = args.Compress
+        if CompressionName == None:
+            logger.error("Invalid option value, Compression Type can't be NULL")
+            return STATUS_ERROR 
+            
+    if args.GuidValue:
+        res = StringToGuid(args.GuidValue,VendorGuid)
+        if type(res) == 'int':
+            Status = res
+        else:
+            Status = res[0]
+            VendorGuid = res[1]
+            
+        if EFI_ERROR (Status):
+            logger.error("Invalid option value")
+            return STATUS_ERROR
+        
+    if args.dummyfile:
+        DummyFileName = args.dummyfile
+        if DummyFileName == None:
+            logger.error("Invalid option value, Dummy file can't be NULL")
+            return STATUS_ERROR
+            
+    if args.GuidAttr:
+        if args.GuidAttr == None:
+            logger.error("Invalid option value, Guid section attributes can't be NULL")
+            return STATUS_ERROR
+        if args.GuidAttr == mGUIDedSectionAttribue[EFI_GUIDED_SECTION_PROCESSING_REQUIRED]:
+            SectGuidAttribute |= EFI_GUIDED_SECTION_PROCESSING_REQUIRED
+        elif args.GuidAttr == mGUIDedSectionAttribue[EFI_GUIDED_SECTION_AUTH_STATUS_VALID]:
+            SectGuidAttribute |= EFI_GUIDED_SECTION_AUTH_STATUS_VALID
+        elif args.GuidAttr == mGUIDedSectionAttribue[0]:
+            #None atrribute
+            SectGuidAttribute |= EFI_GUIDED_SECTION_NONE
+        else:
+            logger.error("Invalid option value")
+            return STATUS_ERROR
     
-    if sys.argv[arg_index] == "-h" or sys.argv[arg_index] == "--help":
-        Version()
-        Usage()
-        return STATUS_SUCCESS
+    if args.GuidHeaderLength:
+        res = AsciiStringToUint64(args.GuidHeaderLength,False,SectGuidHeaderLength)
+        if type(res) == 'int':
+            Status = res
+        else:
+            Status = res[0]
+            SectGuidHeaderLength = res[1]
+            
+        if EFI_ERROR (Status):
+            logger.error("Invalid option value for GuidHeaderLength")
+            return STATUS_ERROR
     
-    if sys.argv[arg_index] == "--version":
-        Version()
-        return STATUS_SUCCESS
-
-    while argc > 0:
-        #Parse command line
-        #print(arg_index)
-        if sys.argv[arg_index] == "-s" or sys.argv[arg_index] == "--SectionType":
-            SectionName = sys.argv[arg_index + 1]
-            if SectionName == None:
-                logger.error("Invalid option value, Section Type can't be NULL")
-                return STATUS_ERROR
-            argc -= 2
-            arg_index += 2
-            continue
-                
-        if sys.argv[arg_index] == "-o" or sys.argv[arg_index] == "--outputfile":
-            OutputFileName = sys.argv[arg_index + 1]
-            if OutputFileName == None:
-                logger.error("Invalid option value, Output file can't be NULL")
-                return STATUS_ERROR
-            argc -= 2
-            arg_index += 2
-            continue
-                
-        if sys.argv[arg_index] == "-c" or sys.argv[arg_index] == "--compress":
-            CompressionName = sys.argv[arg_index + 1]
-            if CompressionName == None:
-                logger.error("Invalid option value, Compression Type can't be NULL")
-                return STATUS_ERROR 
-            argc -= 2
-            arg_index += 2
-            continue
-                
-        if sys.argv[arg_index] == "-g" or sys.argv[arg_index] == "--vendor":
-            res = StringToGuid(sys.argv[arg_index + 1],VendorGuid)
-            if type(res) == 'int':
-                Status = res
-            else:
-                Status = res[0]
-                VendorGuid = res[1]
-                
-            if EFI_ERROR (Status):
+    if args.String:
+        StringBuffer = args.String
+        if args.String == None:
+            logger.error("Invalid option value, Name can't be NULL")
+            return STATUS_ERROR
+        
+    if args.Number:
+        if args.Number == None:
+            logger.error("Invalid option value, build number can't be NULL")
+            return STATUS_ERROR
+        
+        #Verify string is a integrator number
+        for ch in args.Number:
+            if ch != '-' and isdigit(ch) == 0:
                 logger.error("Invalid option value")
                 return STATUS_ERROR
-            argc -= 2
-            arg_index += 2
-            continue
-            
-        if sys.argv[arg_index] == "--dummy":
-            DummyFileName = sys.argv[arg_index + 1]
-            if DummyFileName == None:
-                logger.error("Invalid option value, Dummy file can't be NULL")
-                return STATUS_ERROR
-            argc -= 2
-            arg_index += 2
-            continue
-                
-        if sys.argv[arg_index] == "-r" or sys.argv[arg_index] == "--attributes":
-            if sys.argv[arg_index + 1] == None:
-                logger.error("Invalid option value, Guid section attributes can't be NULL")
-                return STATUS_ERROR
-            if sys.argv[arg_index + 1] == mGUIDedSectionAttribue[EFI_GUIDED_SECTION_PROCESSING_REQUIRED]:
-                SectGuidAttribute |= EFI_GUIDED_SECTION_PROCESSING_REQUIRED
-            elif sys.argv[arg_index + 1] == mGUIDedSectionAttribue[EFI_GUIDED_SECTION_AUTH_STATUS_VALID]:
-                SectGuidAttribute |= EFI_GUIDED_SECTION_AUTH_STATUS_VALID
-            elif sys.argv[arg_index + 1] == mGUIDedSectionAttribue[0]:
-                #None atrribute
-                SectGuidAttribute |= EFI_GUIDED_SECTION_NONE
-            else:
-                logger.error("Invalid option value")
-                return STATUS_ERROR
-            argc -= 2
-            arg_index += 2
-            continue
+        VersionNumber = int(args.Number)
         
-        if sys.argv[arg_index] == "-l" or sys.argv[arg_index] == "--HeaderLength":
-            res = AsciiStringToUint64(sys.argv[arg_index + 1],False,SectGuidHeaderLength)
-            if type(res) == 'int':
-                Status = res
-            else:
-                Status = res[0]
-                SectGuidHeaderLength = res[1]
-                
-            if EFI_ERROR (Status):
-                logger.error("Invalid option value for GuidHeaderLength")
-                return STATUS_ERROR
-            argc -= 2
-            arg_index += 2
-            continue
+    # if args.debug_level:
+    #     Status = AsciiStringToUint64(args.debug_level,False,LogLevel)
+    #     if EFI_ERROR (Status):
+    #         logger.error("Invalid option value, Debug Level range is 0~9, current input level is %s", LogLevel)
+    #     if LogLevel > 9:
+    #         logger.error("Invalid option value, Debug Level range is 0~9, current input level is %s", LogLevel)
+    #     SetPrintLevel (LogLevel)
         
-        if sys.argv[arg_index] == "-n" or sys.argv[arg_index] == "--name":
-            StringBuffer = sys.argv[arg_index + 1]
-            if StringBuffer == None:
-                logger.error("Invalid option value, Name can't be NULL")
-                return STATUS_ERROR
-            argc -= 2
-            arg_index += 2
-            print('The python tool of GenSec is called!')
-            continue
-            
-        if sys.argv[arg_index] == "-j" or sys.argv[arg_index] == "--buildnumber":
-            if sys.argv[arg_index + 1] == None:
-                logger.error("Invalid option value, build number can't be NULL")
-                return STATUS_ERROR
-            
-            #Verify string is a integrator number
-            for ch in sys.argv[arg_index + 1]:
-                if ch != '-' and isdigit(ch) == 0:
-                    logger.error("Invalid option value")
-                    return STATUS_ERROR
-            VersionNumber = int(sys.argv[arg_index + 1])
-            argc -= 2
-            arg_index += 2
-            continue
-        
-        if sys.argv[arg_index] == "-q" or sys.argv[arg_index] == "--quiet":
-            logger.setLevel(logging.CRITICAL)
-            argc -= 1
-            arg_index += 1
-            continue
-        
-        if sys.argv[arg_index] == "-v" or sys.argv[arg_index] == "--verbose":
-            logger.setLevel(logging.DEBUG)
-            argc -= 1
-            arg_index += 1
-            continue
- 
-        if sys.argv[arg_index] == "d" or sys.argv[arg_index] == "--debug":
-            Status = AsciiStringToUint64 (sys.argv[arg_index + 1], False, LogLevel)
-            if type(res) == 'int':
-                Status = res
-            else:
-                Status = res[0]
-                LogLevel = res[1]
-            if EFI_ERROR (Status):
-                logger.error("Invalid option value", "%s = %s"  %(sys.argv[arg_index],sys.argv[arg_index + 1]))
-                return STATUS_ERROR
-            if LogLevel > 9:
-                logger.error("Invalid option value,Debug Level range is 0~9, current input level is %d" %(LogLevel))
-                return STATUS_ERROR
-            logger.setLevel(LogLevel)
-            argc -= 2
-            arg_index += 2
-            continue
-            
-        #Section File alignment requirement
-        if sys.argv[arg_index] == "--sectionalign":
-            if InputFileAlignNum == 0:
-                for i in range(MAXIMUM_INPUT_FILE_NUM):
-                    InputFileAlign.append(1)
-            elif InputFileAlignNum % MAXIMUM_INPUT_FILE_NUM == 0:
-                for i in range(InputFileNum,InputFileNum + MAXIMUM_INPUT_FILE_NUM,1):
-                    InputFileAlign.append(1)
+    #Section File alignment requirement
+    if args.SectionAlign:
+        if InputFileAlignNum == 0:
+            for i in range(MAXIMUM_INPUT_FILE_NUM):
+                InputFileAlign.append(1)
+        elif InputFileAlignNum % MAXIMUM_INPUT_FILE_NUM == 0:
+            for i in range(InputFileNum,InputFileNum + MAXIMUM_INPUT_FILE_NUM,1):
+                InputFileAlign.append(1)
 
-            if sys.argv[arg_index + 1] == "0":
+        temp = args.SectionAlign
+        for ch in temp:
+            if ch == "0":
                 InputFileAlign[InputFileAlignNum] = 0
                 #InputFileAlign.append(0)
             else:
-                res = StringtoAlignment(sys.argv[arg_index + 1],InputFileAlign[InputFileAlignNum])
+                res = StringtoAlignment(ch,InputFileAlign[InputFileAlignNum])
                 if type(res) == 'int':
                     Status = res
                 else:
@@ -289,31 +210,27 @@ def main():
                     if EFI_ERROR (Status):
                         logger.error("Invalid option value")
                         return STATUS_ERROR
-            argc -= 2
-            arg_index += 2
             InputFileAlignNum += 1
-            continue
 
-        #Get Input file name
-        if InputFileNum == 0 and len(InputFileName) == 0:
-            for i in range(MAXIMUM_INPUT_FILE_NUM):
-                InputFileName.append('\0') 
 
-        elif InputFileNum % MAXIMUM_INPUT_FILE_NUM == 0:
-            for i in range(InputFileNum,InputFileNum + MAXIMUM_INPUT_FILE_NUM,1):
-                InputFileName[i] = '\0'
-                
-        InputFileName[InputFileNum] = sys.argv[arg_index]
-        InputFileNum += 1
-        argc -= 1
-        arg_index += 1
-        
-        # if args.input:
-        #     #InputFileName[InputFileNum] = args.input
-        #     temp = []
-        #     temp.append(args.input)
-        #     InputFileName = temp[0]
-        #     InputFileNum = len(InputFileName)
+
+    #Get Input file name
+    # if InputFileNum == 0 and len(InputFileName) == 0:
+    #     for i in range(MAXIMUM_INPUT_FILE_NUM):
+    #         InputFileName.append('0') 
+
+    # elif InputFileNum % MAXIMUM_INPUT_FILE_NUM == 0:
+    #     for i in range(InputFileNum,InputFileNum + MAXIMUM_INPUT_FILE_NUM,1):
+    #         InputFileName[i] = '0'
+            
+    # for i in range(InputFileNum):
+    
+    if args.input:
+        #InputFileName[InputFileNum] = args.input
+        temp = []
+        temp.append(args.input)
+        InputFileName = temp[0]
+        InputFileNum = len(InputFileName)
     
     if InputFileAlignNum > 0 and InputFileAlignNum != InputFileNum:
         logger.error("Invalid option, section alignment must be set for each section")
@@ -432,7 +349,7 @@ def main():
     #Check whether there is output file
     if OutputFileName == None:
         logger.error("Missing options: Output file") 
-        return STATUS_ERROR
+        #return STATUS_ERROR
     
     #Finish the command line parsing
     #With in this switch,build and write out the section header including any section
