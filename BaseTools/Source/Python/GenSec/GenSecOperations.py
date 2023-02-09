@@ -291,7 +291,7 @@ def GenSectionCompressionSection(InputFileNum:c_uint32,SectCompSubType:c_uint8,I
     CompressedLength = 0
     TotalLength = 0
     res = GetSectionContents(InputFileNum,InputLength,InputFileName,InputFileAlign,FileBuffer)
-    if type(res) == 'int':
+    if type(res) == int:
         Status = res
     else:
         Status = res[0]
@@ -300,8 +300,9 @@ def GenSectionCompressionSection(InputFileNum:c_uint32,SectCompSubType:c_uint8,I
     
     if Status == EFI_BUFFER_TOO_SMALL:
         #Read all input file contents into a buffer
+        FileBuffer = b''
         res = GetSectionContents(InputFileNum,InputLength,InputFileName,InputFileAlign,FileBuffer)
-        if type(res) == 'int':
+        if type(res) == int:
             Status = res
         else:
             Status = res[0]
@@ -335,7 +336,7 @@ def GenSectionCompressionSection(InputFileNum:c_uint32,SectCompSubType:c_uint8,I
     #Actual compressing 
     if CompressFunction != None:
         res = CompressFunction(InputLength,CompressedLength,FileBuffer,OutputBuffer)
-        if type(res) == 'int':
+        if type(res) == int:
             Status = res
         else:
             Status = res[0]
@@ -350,7 +351,7 @@ def GenSectionCompressionSection(InputFileNum:c_uint32,SectCompSubType:c_uint8,I
             TotalLength = CompressedLength + HeaderLength
             # OutputBuffer = b'\0' * TotalLength
             res = CompressFunction(InputLength,CompressedLength,FileBuffer,OutputBuffer)
-            if type(res) == 'int':
+            if type(res) == int:
                 Status = res
             else:
                 Status = res[0]
@@ -405,7 +406,7 @@ def GenSectionGuidDefinedSection(InputFileNum:c_uint32,VendorGuid:EFI_GUID,DataA
     #Read all input file contents into a buffer
     #first get the size of all file contents
     res = GetSectionContents(InputFileNum,InputLength,InputFileName,InputFileAlign,FileBuffer)
-    if type(res) == 'int':
+    if type(res) == int:
         Status = res
     else:
         Status = res[0]
@@ -430,7 +431,7 @@ def GenSectionGuidDefinedSection(InputFileNum:c_uint32,VendorGuid:EFI_GUID,DataA
         #Read all input file contents into a buffer
         FileBuffer = b''
         res = GetSectionContents(InputFileNum,InputLength,InputFileName,InputFileAlign,FileBuffer)
-        if type(res) == 'int':
+        if type(res) == int:
             Status = res
         else:
             Status = res[0]
@@ -534,7 +535,7 @@ def GenSectionSubtypeGuidSection(InputFileNum:c_uint32,SubTypeGuid:EFI_GUID,
     #Read all input file contents into a buffer
     #first get the size of all file contents
     res = GetSectionContents(InputFileNum,InputLength,InputFileName,InputFileAlign,FileBuffer)
-    if type(res) == 'int':
+    if type(res) == int:
         Status = res
     else:
         Status =res[0]
@@ -548,8 +549,9 @@ def GenSectionSubtypeGuidSection(InputFileNum:c_uint32,SubTypeGuid:EFI_GUID,
         TotalLength = InputLength + Offset
         
         #Read all input file contents into a buffer
+        FileBuffer = b''
         res = GetSectionContents(InputFileNum,InputLength,InputFileName,InputFileAlign,FileBuffer)
-        if type(res) == 'int':
+        if type(res) == int:
             Status = res
         else:
             Status =res[0]
