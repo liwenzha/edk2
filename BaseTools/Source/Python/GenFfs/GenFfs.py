@@ -97,8 +97,8 @@ parser.add_argument("-s","--checksum",dest="checksum",help="Indicates to calcula
 parser.add_argument("-a","--align",dest="FileAlign",help="FileAlign points to file alignment, which only support\
                     the following align: 1,2,4,8,16,128,512,1K,4K,32K,64K\
                     128K,256K,512K,1M,2M,4M,8M,16M")
-parser.add_argument("-i","--sectionfile",dest="SectionFile",help="Section file will be contained in this FFS file.")
-parser.add_argument("-oi","--optionalsectionfile",dest="OptionalSectionFile",help="If the Section file exists, it will be contained in this FFS file, otherwise, it will be ignored.")
+parser.add_argument("-i","--sectionfile",dest="SectionFile",action = 'append',help="Section file will be contained in this FFS file.")
+parser.add_argument("-oi","--optionalsectionfile",dest="OptionalSectionFile",action = 'append',help="If the Section file exists, it will be contained in this FFS file, otherwise, it will be ignored.")
 parser.add_argument("-n","--sectionalign",dest="SectionAlign",help="SectionAlign points to section alignment, which support\
                     the alignment scope 0~16M. If SectionAlign is specified\
                     as 0, tool get alignment value from SectionFile. It is\
@@ -132,7 +132,7 @@ def StringtoAlignment(AlignBuffer:str, AlignNumber:c_uint32) -> int:
 def StringToType(String:str):
     if String == None:
         return EFI_FV_FILETYPE_ALL
-    Index = 0
+    #Index = 0
     for Index in range(int(sizeof (mFfsFileType) / sizeof (c_char))):
         if mFfsFileType [Index] != None and String == mFfsFileType [Index]:
             return Index
@@ -143,14 +143,12 @@ def StringToType(String:str):
 def GetSectionContents(InputFileNum:c_uint32,BufferLength:c_uint32,FfsAttrib:c_uint8,MaxAlignment:c_uint32,
                        PESectionNum:c_uint8,InputFileName=[],InputFileAlign=[],FileBuffer=b'',):
     
-    logger=logging.getLogger('GenSec')
-    
-    if InputFileNum < 1:
-        logger.error("Invalid parameter, must specify at least one input file")
-        return EFI_INVALID_PARAMETER
-    if BufferLength == None:
-        logger.error("Invalid parameter, BufferLength can't be NULL")
-        return EFI_INVALID_PARAMETER
+    # if InputFileNum < 1:
+    #     logger.error("Invalid parameter, must specify at least one input file")
+    #     return EFI_INVALID_PARAMETER
+    # if BufferLength == None:
+    #     logger.error("Invalid parameter, BufferLength can't be NULL")
+    #     return EFI_INVALID_PARAMETER
 
     Size = 0
     Offset = 0 
@@ -284,6 +282,7 @@ def FfsRebaseImageRead(FileOffset:c_uint64,ReadSize:c_uint32,FileHandle = b'',Bu
 def GetAlignmentFromFile(InFile:str,Alignment:c_uint32) -> int:
 
     PeFileBuffer = b''
+    Alignment = 0
     
     with open(InFile,'rb') as InFileHandle:
         if InFileHandle == None:
@@ -297,8 +296,10 @@ def GetAlignmentFromFile(InFile:str,Alignment:c_uint32) -> int:
     CurSecHdrSize = sizeof(CommonHeader)
     
     ImageContext = PE_COFF_LOADER_IMAGE_CONTEXT()
-    ImageContext.Handle =  PeFileBuffer[CurSecHdrSize:CurSecHdrSize + sizeof(c_uint64)]
-    ImageContext.ImageRead = FfsRebaseImageRead
+    #ImageContext.Handle =  PeFileBuffer[CurSecHdrSize:CurSecHdrSize + sizeof(c_uint64)]
+    ImageContext.Handle =  PeFileBuffer[CurSecHdrSize:CurSecHdrSize + sizeof(c_uint64)].decode()
+    
+    #ImageContext.ImageRead = FfsRebaseImageRead
     Status = PeCoffLoaderGetImageInfo(ImageContext)
     if EFI_ERROR(Status):
         logger.error("Invalid PeImage,he input file is %s and return status is %x" %(InFile,Status))
@@ -327,8 +328,8 @@ def main():
     # FfsAttrib = EFI_FFS_FILE_ATTRIBUTES()
     InputFileNum = 0
     Alignment = 0
-    InputFileName = ['0']*100
-    InputFileAlign = [0]*100
+    InputFileName = []
+    InputFileAlign = []
     AlignmentBuffer = ''
     FileSize = 0
     FfsAttrib = 0
@@ -407,9 +408,11 @@ def main():
             return Status
         #if args.OptionalSectionFile:
         if args.SectionFile:
-            InputFileName[InputFileNum] = args.SectionFile
+            InputFileName = args.SectionFile
+            InputFileNum = len(InputFileName)
         elif args.OptionalSectionFile:
-            InputFileName[InputFileNum] = args.OptionalSectionFile
+            InputFileName = args.OptionalSectionFile
+            InputFileNum = len(InputFileName)
         
         #Section File alignment requirement
         if args.SectionAlign:
