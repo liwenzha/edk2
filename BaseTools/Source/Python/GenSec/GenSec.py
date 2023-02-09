@@ -4,11 +4,11 @@
 #Copyright (c) 2004 - 2018, Intel Corporation. All rights reserved.<BR>
 #SPDX-License-Identifier: BSD-2-Clause-Patent
 
+import sys
+sys.path.append("..") 
 
 from FirmwareStorageFormat.SectionHeader import *
 import logging
-import sys
-import GenCrc32
 import argparse
 from EfiCompress import *
 from PeCoff import *
@@ -156,7 +156,7 @@ def main():
                 
         if sys.argv[arg_index] == "-g" or sys.argv[arg_index] == "--vendor":
             res = StringToGuid(sys.argv[arg_index + 1],VendorGuid)
-            if type(res) == 'int':
+            if type(res) == int:
                 Status = res
             else:
                 Status = res[0]
@@ -198,7 +198,7 @@ def main():
         
         if sys.argv[arg_index] == "-l" or sys.argv[arg_index] == "--HeaderLength":
             res = AsciiStringToUint64(sys.argv[arg_index + 1],False,SectGuidHeaderLength)
-            if type(res) == 'int':
+            if type(res) == int:
                 Status = res
             else:
                 Status = res[0]
@@ -250,7 +250,7 @@ def main():
  
         if sys.argv[arg_index] == "d" or sys.argv[arg_index] == "--debug":
             Status = AsciiStringToUint64 (sys.argv[arg_index + 1], False, LogLevel)
-            if type(res) == 'int':
+            if type(res) == int:
                 Status = res
             else:
                 Status = res[0]
@@ -280,15 +280,15 @@ def main():
                 #InputFileAlign.append(0)
             else:
                 res = StringtoAlignment(sys.argv[arg_index + 1],InputFileAlign[InputFileAlignNum])
-                if type(res) == 'int':
+                if type(res) == int:
                     Status = res
                 else:
                     Status = res[0]
                     InputFileAlign[InputFileAlignNum] = res[1]
                     #InputFileAlign.append(res[1])
-                    if EFI_ERROR (Status):
-                        logger.error("Invalid option value")
-                        return STATUS_ERROR
+                if Status != 0:
+                    logger.error("Invalid option value:Alignment")
+                    return STATUS_ERROR
             argc -= 2
             arg_index += 2
             InputFileAlignNum += 1
@@ -297,11 +297,11 @@ def main():
         #Get Input file name
         if InputFileNum == 0 and len(InputFileName) == 0:
             for i in range(MAXIMUM_INPUT_FILE_NUM):
-                InputFileName.append('\0') 
+                InputFileName.append('0') 
 
         elif InputFileNum % MAXIMUM_INPUT_FILE_NUM == 0:
             for i in range(InputFileNum,InputFileNum + MAXIMUM_INPUT_FILE_NUM,1):
-                InputFileName[i] = '\0'
+                InputFileName[i] = '0'
                 
         InputFileName[InputFileNum] = sys.argv[arg_index]
         InputFileNum += 1
@@ -321,7 +321,7 @@ def main():
     for Index in range(InputFileAlignNum):
         if InputFileAlign[Index] == 0:
             res = GetAlignmentFromFile(InputFileName[Index], InputFileAlign[Index])
-            if type(res) == 'int':
+            if type(res) == int:
                 Status = res
             else:
                 Status =res[0]
@@ -439,7 +439,7 @@ def main():
     #type specific pieces. If there is an input file, it's tacked on later
     if SectType == EFI_SECTION_COMPRESSION:
         res = GenSectionCompressionSection(InputFileNum,SectCompSubType,InputFileName,InputFileAlign,OutFileBuffer)
-        if type(res) == 'int':
+        if type(res) == int:
             Status = res
         else:
             Status =res[0]
@@ -447,7 +447,7 @@ def main():
             
     elif SectType == EFI_SECTION_GUID_DEFINED:
         res = GenSectionGuidDefinedSection(InputFileNum,VendorGuid,SectGuidAttribute,SectGuidHeaderLength,InputFileName,InputFileAlign,OutFileBuffer)
-        if type(res) == 'int':
+        if type(res) == int:
             Status = res
         else:
             Status =res[0]
@@ -455,7 +455,7 @@ def main():
          
     elif SectType == EFI_SECTION_FREEFORM_SUBTYPE_GUID:
         res = GenSectionSubtypeGuidSection(InputFileNum,VendorGuid,InputFileName,InputFileAlign,OutFileBuffer)
-        if type(res) == 'int':
+        if type(res) == int:
             Status = res
         else:
             Status =res[0]
@@ -503,7 +503,7 @@ def main():
         #first fet the size of all file contents
         
         res = GetSectionContents(InputFileNum,InputLength,InputFileName,InputFileAlign,OutFileBuffer)
-        if type(res) == 'int':
+        if type(res) == int:
             Status = res
         else:
             Status = res[0]
@@ -513,7 +513,7 @@ def main():
         if Status == EFI_BUFFER_TOO_SMALL:
             #OutFileBuffer = b'\0'* InputLength
             res = GetSectionContents(InputFileNum,InputLength,InputFileName,InputFileAlign,OutFileBuffer)
-            if type(res) == 'int':
+            if type(res) == int:
                 Status = res
             else:
                 Status = res[0]
@@ -523,7 +523,7 @@ def main():
     else:
         #All other section types are caught by default(they're all the same)
         res =  GenSectionCommonLeafSection(SectType,InputFileNum,InputFileName,OutFileBuffer)
-        if type(res) == 'int':
+        if type(res) == int:
             Status = res
         else:
             Status = res[0]

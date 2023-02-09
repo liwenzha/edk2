@@ -4,6 +4,9 @@
 #Copyright (c) 2004 - 2018, Intel Corporation. All rights reserved.<BR>
 #SPDX-License-Identifier: BSD-2-Clause-Patent
 
+import sys
+sys.path.append("..") 
+
 from FirmwareStorageFormat.SectionHeader import *
 import logging
 from BaseTypes import *

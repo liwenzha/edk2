@@ -23,7 +23,7 @@ class EFI_COMMON_SECTION_HEADER(Structure):
     def SECTION_SIZE(self) -> int:
         return self.Size[0] | self.Size[1] << 8 | self.Size[2] << 16
     
-    @property
+    #@property
     def SET_SECTION_SIZE(self,size):
         self.Size[0] = size & 0xff
         self.Size[1] = (size & 0xff00) >> 8
@@ -130,7 +130,7 @@ class EFI_GUID_DEFINED_SECTION(Structure):
     _pack_ = 1
     _fields_ = [
         ('CommonHeader', EFI_COMMON_SECTION_HEADER),
-        ('SectionDefinitionGuid',    GUID),
+        ('SectionDefinitionGuid',    EFI_GUID),
         ('DataOffset',               c_uint16),
         ('Attributes',               c_uint16)
     ]
@@ -168,19 +168,19 @@ class EFI_TE_IMAGE_HEADER(Structure):
         ('AddressOfEntryPoint',c_uint32),
         ('BaseOfCode',c_uint32),
         ('ImageBase',c_uint64),
-        ('DataDirectory[2]',EFI_IMAGE_DATA_DIRECTORY),
+        ('DataDirectory',ARRAY(EFI_IMAGE_DATA_DIRECTORY,2)),
     ]
     
     def ExtHeaderSize(self) -> int:
         return 40
 
 
-class PE_COFF_LOADER_READ_FILE(Structure):
-    _pack_=  1
-    _fields_ =[('FileOffset',c_uint64),
-               ('ReadSize',c_uint64),
-               ('FileHandle',c_void_p),
-               ('Buffer',c_void_p)]
+# class PE_COFF_LOADER_READ_FILE(Structure):
+#     _pack_=  1
+#     _fields_ =[('FileOffset',c_uint64),
+#                ('ReadSize',c_uint64),
+#                ('FileHandle',c_void_p),
+#                ('Buffer',c_void_p)]
 
 
 class PE_COFF_LOADER_IMAGE_CONTEXT(Structure):
@@ -189,14 +189,14 @@ class PE_COFF_LOADER_IMAGE_CONTEXT(Structure):
                ('ImageSize',c_uint64),
                ('DestinationAddress',PHYSICAL_ADDRESS),
                ('EntryPoint',PHYSICAL_ADDRESS),
-               ('ImageRead',PE_COFF_LOADER_READ_FILE),
-               ('Handle',c_void_p),
+               ('ImageRead',c_int),
+               ('Handle',c_wchar_p),
                ('FixupData',c_void_p),
                ('SectionAlignment',c_uint32),
                ('PeCoffHeaderOffset',c_uint32),
                ('DebugDirectoryEntryRva',c_uint32),
-               ('CodeView',c_int),
-               ('PdbPointer',c_char),
+               ('CodeView',c_void_p),
+               ('PdbPointer',c_char_p),
                ('SizeOfHeaders',c_uint64),
                ('ImageCodeMemoryType',c_uint32),
                ('ImageDataMemoryType',c_uint32),
@@ -402,21 +402,30 @@ class EFI_IMAGE_DEBUG_DIRECTORY_ENTRY(Structure):
     ]
 
 
-class EFI_VERSION_SECTION(Structure):
-    _pack_ = 1
-    _fields_ = [
-        ('CommonHeader',EFI_COMMON_SECTION_HEADER),
-        ('BuildNumber',c_uint16),
-        ('VersionString',c_char)
-    ]
-    
 
-class EFI_USER_INTERFACE_SECTION(Structure):
-    _pack_ = 1
-    _fields_ = [
-        ('CommonHeader',EFI_COMMON_SECTION_HEADER),
-        ('FileNameString',c_char)
-    ]
+def SET_EFI_VERSION_SECTION(nums:int):
+    class EFI_VERSION_SECTION(Structure):
+        _pack_ = 1
+        _fields_ = [
+            ('CommonHeader',EFI_COMMON_SECTION_HEADER),
+            ('BuildNumber',c_uint16),
+            ('VersionString',ARRAY(c_uint16,nums))
+        ]
+        def __init__(self,nums):
+            self.CommonHeader = EFI_COMMON_SECTION_HEADER()
+    return EFI_VERSION_SECTION(nums)
+
+
+def SET_EFI_USER_INTERFACE_SECTION(nums:int):
+    class EFI_USER_INTERFACE_SECTION(Structure):
+        _pack_ = 1
+        _fields_ = [
+            ('CommonHeader',EFI_COMMON_SECTION_HEADER),
+            ('FileNameString',ARRAY(c_uint16,nums))
+        ]
+        def __init__(self,nums):
+            self.CommonHeader = EFI_COMMON_SECTION_HEADER()
+    return EFI_USER_INTERFACE_SECTION(nums)
 
 
 def Get_USER_INTERFACE_Header(nums: int):

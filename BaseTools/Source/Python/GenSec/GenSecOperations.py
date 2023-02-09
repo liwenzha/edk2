@@ -4,9 +4,11 @@
 #Copyright (c) 2004 - 2018, Intel Corporation. All rights reserved.<BR>
 #SPDX-License-Identifier: BSD-2-Clause-Patent
 
+import sys
+sys.path.append("..") 
+
 from FirmwareStorageFormat.SectionHeader import *
 import logging
-import sys
 import GenCrc32.GenCrc32 as Gen
 import argparse
 from EfiCompress import *
@@ -198,10 +200,9 @@ def GetSectionContents(InputFileNum:c_uint32,BufferLength:c_uint32,InputFileName
                 return EFI_ABORTED
             Data = InFile.read()
         FileSize = len(Data)
-    
+        
         #Adjust section buffer when section alignment is required.
-        if len(InputFileAlign) != 0:
-            
+        if (sum(InputFileAlign) != len(InputFileAlign)):
             #Check this section is Te/Pe section, and Calculate the numbers of Te/Pe section.
             TeOffset = 0
             
@@ -237,25 +238,21 @@ def GetSectionContents(InputFileNum:c_uint32,BufferLength:c_uint32,InputFileName
             if TeOffset != 0:
                 TeOffset = InputFileAlign[Index] - (TeOffset % InputFileAlign[Index])
                 TeOffset = TeOffset % InputFileAlign[Index]
-            
+                
+            # print("%d %d %d,%d,%d" %(Size,HeaderSize,Offset,InputFileAlign[Index],((Size + HeaderSize + TeOffset) % InputFileAlign[Index])))
+            # print(BufferLength)
             #Make sure section data meet its alignment requirement by adding one raw pad section.
-            if (InputFileAlign[Index] != 0 and (Size + HeaderSize + TeOffset) % InputFileAlign[Index]) != 0:
+            if (InputFileAlign[Index] != 0) and (((Size + HeaderSize + TeOffset) % InputFileAlign[Index]) != 0) and Index != 0:
                 Offset = (Size + sizeof(EFI_COMMON_SECTION_HEADER)+ HeaderSize + TeOffset + InputFileAlign[Index] - 1) & ~ (InputFileAlign [Index] - 1)
                 Offset = Offset - Size - HeaderSize - TeOffset
-                # Offset1 = Offset
-
+                print(Offset)
                 #The maximal alignment is 64K, the raw section size must be less than 0xffffff
                 if FileBuffer != None and ((Size + Offset) < BufferLength):
-                    # while Offset1 > 0: 
-                    #     FileBuffer = FileBuffer + b'\0'
-                    #     Offset1 -= 1
-                    #FileBuffer = FileBuffer.replace(FileBuffer[Size:Size + Offset],b'\0'*Offset)
-
                     SectHeader = EFI_COMMON_SECTION_HEADER()
                     SectHeader.Type = EFI_SECTION_RAW
                     SectHeader.SET_SECTION_SIZE(Offset)
                     #FileBuffer = FileBuffer.replace(FileBuffer[Size:Size + sizeof(EFI_COMMON_SECTION_HEADER)],struct2stream(SectHeader))
-                    FileBuffer = FileBuffer + struct2stream(SectHeader)
+                    FileBuffer = FileBuffer + struct2stream(SectHeader) + b'\0'* (Offset - sizeof(EFI_COMMON_SECTION_HEADER))
                 Size = Size + Offset
             
         #Now read the contents of the file into the buffer
@@ -414,6 +411,7 @@ def GenSectionGuidDefinedSection(InputFileNum:c_uint32,VendorGuid:EFI_GUID,DataA
         Status = res[0]
         FileBuffer = res[1]
         InputLength = res[2]
+        
     
     if Status == EFI_BUFFER_TOO_SMALL:
         if CompareGuid(VendorGuid,mZeroGuid) == 0:
@@ -425,12 +423,12 @@ def GenSectionGuidDefinedSection(InputFileNum:c_uint32,VendorGuid:EFI_GUID,DataA
             if InputLength + Offset >= MAX_SECTION_SIZE:
                 Offset = sizeof(EFI_GUID_DEFINED_SECTION2)
         TotalLength = InputLength + Offset
-        
         if FileBuffer == None:
             logger.error("Resource, memory cannot be allocated")
             return EFI_OUT_OF_RESOURCES
         
         #Read all input file contents into a buffer
+        FileBuffer = b''
         res = GetSectionContents(InputFileNum,InputLength,InputFileName,InputFileAlign,FileBuffer)
         if type(res) == 'int':
             Status = res
@@ -438,7 +436,6 @@ def GenSectionGuidDefinedSection(InputFileNum:c_uint32,VendorGuid:EFI_GUID,DataA
             Status = res[0]
             FileBuffer = res[1]
             InputLength = res[2]
-    
     if EFI_ERROR(Status):
         logger.error("Error opening file for reading")
         return Status
@@ -523,6 +520,7 @@ def GenSectionSubtypeGuidSection(InputFileNum:c_uint32,SubTypeGuid:EFI_GUID,
     InputLength = 0
     Offset = 0
     FileBuffer = b''
+    TotalLength = 0
 
     
     if InputFileNum > 1:
