@@ -4,13 +4,15 @@
 #SPDX-License-Identifier: BSD-2-Clause-Patent
 
 import argparse
+import sys
+sys.path.append('..')
+
 from FirmwareStorageFormat.SectionHeader import *
 from FirmwareStorageFormat.FfsFileHeader import *
 from PeCoff import *
 from BaseTypes import *
 from ParseInf import *
 import logging
-import sys
 
 
 UTILITY_NAME = 'GenFfs'

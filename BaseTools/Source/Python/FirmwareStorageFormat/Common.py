@@ -56,6 +56,17 @@ class GUID(Structure):
                 rt = rt & (self.Guid4[i] == otherguid.Guid4[i])
         return rt
 
+
+class COMPRESS_FUNCTION(Structure):
+    _pack_ = 1
+    _fields_ = [
+        ('SrcBuffer',c_uint8),
+        ('SrcSize',c_uint32),
+        ('DstBuffer',c_uint8),
+        ('DstSize',c_uint32),
+    ]        
+    
+    
 def ModifyGuidFormat(target_guid: str) -> GUID:
     target_guid = target_guid.replace('-', '')
     target_list = []
