@@ -612,7 +612,7 @@ def main():
             return Status
         FfsFile.write(struct2stream(FfsFileHeader))      #Write header
         if FileBuffer != None:
-            FfsFile.write(FileBuffer)                        #Write data
+            FfsFile.write(FileBuffer)                    #Write data
     
     
 if __name__=="__main__":
